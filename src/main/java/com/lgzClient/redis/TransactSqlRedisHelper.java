@@ -2,6 +2,7 @@ package com.lgzClient.redis;
 
 
 import com.alibaba.nacos.common.utils.StringUtils;
+import com.lgzClient.annotations.DCSTransaction;
 import com.lgzClient.types.GlobalType;
 import com.lgzClient.types.LocalType;
 import com.lgzClient.types.status.GlobalStatus;

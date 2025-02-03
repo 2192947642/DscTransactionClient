@@ -28,13 +28,12 @@ public class ConnectionWrapper implements Connection {
     @Override
     public PreparedStatement prepareStatement(String sql) throws SQLException {
         // 在创建 PreparedStatement 之前添加额外操作
-        return new PreparedStatementWrapper(targetConnection.prepareStatement(sql),sql);
+        return new PreparedStatementWrapper(targetConnection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS),sql);
     }
 
     @Override
     public CallableStatement prepareCall(String sql) throws SQLException {
         // 在创建 CallableStatement 之前添加额外操作
-
         return targetConnection.prepareCall(sql);
     }
 
@@ -126,9 +125,7 @@ public class ConnectionWrapper implements Connection {
 
     @Override
     public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-
          return new PreparedStatementWrapper(targetConnection.prepareStatement(sql, resultSetType, resultSetConcurrency),sql);
-
     }
 
     @Override

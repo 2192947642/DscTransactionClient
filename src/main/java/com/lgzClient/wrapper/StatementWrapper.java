@@ -5,14 +5,17 @@ import com.lgzClient.types.sql.*;
 import com.lgzClient.utils.SqlUtil;
 
 import java.sql.*;
+import java.util.ArrayList;
 
 public class StatementWrapper implements Statement {
     private Statement statement;
     private SqlUtil sqlUtil;
+    private ArrayList<String> batches;
 
     public StatementWrapper(Statement statement) {
         this.statement = statement;
         this.sqlUtil = new SqlUtil();
+        this.batches = new ArrayList<>();
     }
 
     @Override
@@ -196,11 +199,13 @@ public class StatementWrapper implements Statement {
     @Override
     public void addBatch(String sql) throws SQLException {
         statement.addBatch(sql);
+        batches.add(sql);
     }
 
     @Override
     public void clearBatch() throws SQLException {
         statement.clearBatch();
+        batches.clear();
     }
 
     @Override

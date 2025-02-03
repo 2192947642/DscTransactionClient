@@ -11,12 +11,14 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.Calendar;
 
 public class PreparedStatementWrapper implements PreparedStatement {
     private PreparedStatement preparedStatement;
     private PreparedStatement selectStatement;
     private String sql;
+    private ArrayList<String> batchSqls;
     private SqlUtil sqlUtil;
     public PreparedStatementWrapper(PreparedStatement preparedStatement,String sql) throws SQLException {
         this.preparedStatement = preparedStatement;
@@ -24,7 +26,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
         String selectSql=sqlUtil.buildSelectSql(sql);
         this.sql=sql;
         this.selectStatement=ThreadContext.recodeConnection.get().prepareStatement(selectSql);
-
+        this.batchSqls=new ArrayList<>();
     }
 
     @Override
@@ -36,12 +38,32 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public int executeUpdate() throws SQLException {
-        UpdateRecode updateRecode=new UpdateRecode(sql);
-        updateRecode.before=selectStatement.executeQuery().toString();
-        int number=preparedStatement.executeUpdate();
-        updateRecode.after=selectStatement.executeQuery().toString();
-        ThreadContext.sqlRecodes.get().add(updateRecode);
-        return number;
+        SqlType sqlType = sqlUtil.getSqlType(sql);
+        if (sqlType == SqlType.insert) {
+            InsertRecode insertRecode = new InsertRecode(sql);
+            int number = preparedStatement.executeUpdate(sql);
+            ResultSet generatedKeys = preparedStatement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                insertRecode.generatedKeys.add(generatedKeys.getInt(1));
+            }
+            ThreadContext.sqlRecodes.get().add(insertRecode);
+            return number;
+        } else if (sqlType == SqlType.update) {
+            UpdateRecode updateRecode = new UpdateRecode(sql);
+            updateRecode.before = selectStatement.executeQuery().toString();
+            int number = selectStatement.executeUpdate();
+            updateRecode.after = selectStatement.executeQuery().toString();
+            ThreadContext.sqlRecodes.get().add(updateRecode);
+            return number;
+        } else if (sqlType == SqlType.delete) {
+            DeleteRecode deleteRecode = new DeleteRecode(sql);
+            String selectSql = sqlUtil.buildSelectSql(sql);
+            deleteRecode.before = selectStatement.executeQuery(selectSql).toString();
+            int number = selectStatement.executeUpdate(sql);
+            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            return number;
+        }
+        return preparedStatement.executeUpdate();
     }
 
     @Override
@@ -163,6 +185,10 @@ public class PreparedStatementWrapper implements PreparedStatement {
         if(sqlType == SqlType.insert){
             InsertRecode insertRecode=new InsertRecode(sql);
             boolean flag= preparedStatement.execute();
+            ResultSet generatedKeys = preparedStatement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                insertRecode.generatedKeys.add(generatedKeys.getInt(1));
+            }
             ThreadContext.sqlRecodes.get().add(insertRecode);
             return flag;
         }
@@ -180,6 +206,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
     @Override
     public void addBatch() throws SQLException {
         preparedStatement.addBatch();
+        batchSqls.add(sql);
     }
 
     @Override
@@ -347,25 +374,30 @@ public class PreparedStatementWrapper implements PreparedStatement {
     @Override
     public int executeUpdate(String sql) throws SQLException {
         SqlType sqlType=sqlUtil.getSqlType(sql);
+        String selectSql=sqlUtil.buildSelectSql(sql);
         if(sqlType == SqlType.update){
             UpdateRecode updateRecode=new UpdateRecode(sql);
-            updateRecode.before=selectStatement.executeQuery().toString();
-            int number= preparedStatement.executeUpdate();
-            updateRecode.after=selectStatement.executeQuery().toString();
+            updateRecode.before=preparedStatement.executeQuery(selectSql).toString();
+            int number= preparedStatement.executeUpdate(sql);
+            updateRecode.after=preparedStatement.executeQuery(selectSql).toString();
             ThreadContext.sqlRecodes.get().add(updateRecode);
             return number;
         }
         if(sqlType == SqlType.insert){
             InsertRecode insertRecode=new InsertRecode(sql);
-            int number= preparedStatement.executeUpdate();
+            int number= preparedStatement.executeUpdate(sql);
+            ResultSet generatedKeys = preparedStatement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                insertRecode.generatedKeys.add(generatedKeys.getInt(1));
+            }
             ThreadContext.sqlRecodes.get().add(insertRecode);
             return number;
         }
         if(sqlType == SqlType.delete){
             DeleteRecode deleteRecode=new DeleteRecode(sql);
-            deleteRecode.before=selectStatement.executeQuery().toString();
+            deleteRecode.before=preparedStatement.executeQuery(selectSql).toString();
             ThreadContext.sqlRecodes.get().add(deleteRecode);
-            int number= preparedStatement.executeUpdate();
+            int number= preparedStatement.executeUpdate(sql);
             return number;
         }
         return preparedStatement.executeUpdate(sql);
@@ -433,6 +465,38 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public boolean execute(String sql) throws SQLException {
+        SqlType sqlType=sqlUtil.getSqlType(sql);
+        String selectSql=sqlUtil.buildSelectSql(sql);
+        if(sqlType == SqlType.select){
+            SelectRecode selectRecode = new SelectRecode(sql);
+            ThreadContext.sqlRecodes.get().add(selectRecode);
+            return preparedStatement.execute(sql);
+        }
+        if(sqlType == SqlType.insert){
+            InsertRecode insertRecode = new InsertRecode(sql);
+            boolean flag = preparedStatement.execute(sql, Statement.RETURN_GENERATED_KEYS);
+            ResultSet generatedKeys = preparedStatement.getResultSet();
+            if (generatedKeys.next()) {
+                insertRecode.generatedKeys.add(generatedKeys.getInt(1));
+            }
+            ThreadContext.sqlRecodes.get().add(insertRecode);
+            return flag;
+        }
+        if(sqlType==SqlType.update){
+            UpdateRecode updateRecode = new UpdateRecode(sql);
+            updateRecode.before = preparedStatement.executeQuery(selectSql).toString();
+            boolean flag= preparedStatement.execute(sql);
+            updateRecode.after = preparedStatement.executeQuery(selectSql).toString();
+            ThreadContext.sqlRecodes.get().add(updateRecode);
+            return flag;
+        }
+        if(sqlType==SqlType.delete){
+            DeleteRecode deleteRecode = new DeleteRecode(sql);
+            deleteRecode.before = preparedStatement.executeQuery(selectSql).toString();
+            boolean flag= preparedStatement.execute(sql);
+            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            return flag;
+        }
         return preparedStatement.execute(sql);
     }
 
@@ -484,15 +548,18 @@ public class PreparedStatementWrapper implements PreparedStatement {
     @Override
     public void addBatch(String sql) throws SQLException {
         preparedStatement.addBatch(sql);
+        batchSqls.add(sql);
     }
 
     @Override
     public void clearBatch() throws SQLException {
         preparedStatement.clearBatch();
+        batchSqls.clear();
     }
 
     @Override
     public int[] executeBatch() throws SQLException {
+
         return preparedStatement.executeBatch();
     }
 
@@ -608,6 +675,12 @@ public class PreparedStatementWrapper implements PreparedStatement {
         if(sqlType == SqlType.insert){//如果是插入的话那么就返回插入的id
             InsertRecode insertRecode=new InsertRecode(sql);
             boolean flag= preparedStatement.execute(sql, autoGeneratedKeys);
+            if(autoGeneratedKeys==Statement.RETURN_GENERATED_KEYS){
+                ResultSet generatedKeys = preparedStatement.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    insertRecode.generatedKeys.add(generatedKeys.getInt(1));
+                }
+            }
             ThreadContext.sqlRecodes.get().add(insertRecode);
             return flag;
         }
@@ -640,6 +713,12 @@ public class PreparedStatementWrapper implements PreparedStatement {
         if(sqlType == SqlType.insert){//如果是插入的话那么就返回插入的id
             InsertRecode insertRecode=new InsertRecode(sql);
             boolean flag= preparedStatement.execute(sql, columnIndexes);
+
+                ResultSet generatedKeys = preparedStatement.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    insertRecode.generatedKeys.add(generatedKeys.getInt(1));
+                }
+
             ThreadContext.sqlRecodes.get().add(insertRecode);
             return flag;
         }
@@ -672,6 +751,10 @@ public class PreparedStatementWrapper implements PreparedStatement {
         if(sqlType == SqlType.insert){//如果是插入的话那么就返回插入的id
             InsertRecode insertRecode=new InsertRecode(sql);
             boolean flag= preparedStatement.execute(sql, columnNames);
+            ResultSet generatedKeys = preparedStatement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                insertRecode.generatedKeys.add(generatedKeys.getInt(1));
+            }
             ThreadContext.sqlRecodes.get().add(insertRecode);
             return flag;
         }

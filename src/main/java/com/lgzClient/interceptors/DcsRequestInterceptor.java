@@ -41,6 +41,7 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
         if(request.getAttribute(DcsAfterHandlerOnce)!=null){
             request.setAttribute(DcsPreHandlerOnce,1);
         }
+        ThreadContext.
         HttpServletRequest httpServletRequest= RequestUtil.instance.getRequest();
         String globalId= httpServletRequest.getHeader(DCSHeaders.globalId);//获得全局事务id
         Boolean isBegin=!StringUtils.hasLength(globalId);

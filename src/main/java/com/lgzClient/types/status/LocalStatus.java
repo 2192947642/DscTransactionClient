@@ -4,6 +4,6 @@ public enum LocalStatus {
      wait,//等待
      success,//成功
      fail,//失败
-     commit,
-     rollback,
+     commit,//提交
+     rollback,//回滚
 }

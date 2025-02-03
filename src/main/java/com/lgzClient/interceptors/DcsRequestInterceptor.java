@@ -1,20 +1,15 @@
 package com.lgzClient.interceptors;
 
 import com.alibaba.nacos.common.utils.StringUtils;
-import com.lgzClient.NettyClient;
 import com.lgzClient.redis.TransactSqlRedisHelper;
 import com.lgzClient.service.LocalTransactionManager;
-import com.lgzClient.types.LocalNotice;
+import com.lgzClient.types.LocalLog;
 import com.lgzClient.types.LocalType;
-import com.lgzClient.types.Message;
 import com.lgzClient.types.ThreadContext;
 import com.lgzClient.types.status.DCSHeaders;
 import com.lgzClient.types.status.LocalStatus;
-import com.lgzClient.types.status.MessageTypeEnum;
 import com.lgzClient.utils.AddressUtil;
-import com.lgzClient.utils.JsonUtil;
 import com.lgzClient.utils.RequestUtil;
-import com.lgzClient.utils.TimeUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +36,6 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
         if(request.getAttribute(DcsAfterHandlerOnce)!=null){
             request.setAttribute(DcsPreHandlerOnce,1);
         }
-        ThreadContext.
         HttpServletRequest httpServletRequest= RequestUtil.instance.getRequest();
         String globalId= httpServletRequest.getHeader(DCSHeaders.globalId);//获得全局事务id
         Boolean isBegin=!StringUtils.hasLength(globalId);
@@ -71,10 +65,12 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
                 if (ex != null||ThreadContext.error.get()!=null) {
                     localTransactionManager.rollBack(localType);
                     // 请求抛出了异常
-                    uploadStatusWithNotice(localType, LocalStatus.fail);
+                    localTransactionManager.updateStatusWithNotice(localType, LocalStatus.fail);
                 } else {
-                    // 请求成功
-                    uploadStatus(localType, LocalStatus.success);
+                    LocalLog localLog = LocalLog.buildFromLocalType(localType);
+                    localLog.status=LocalStatus.success;
+                    localTransactionManager.addLogToDatabase(localLog);//将localLog添加到数据库中
+                    localTransactionManager.updateStatus(localType, LocalStatus.success);//修改redis中的本地事务状态为成功
                 }
             }
             TransactionSynchronizationManager.clear();
@@ -82,18 +78,5 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
         }
         ThreadContext.removeAll();
     }
-    private void uploadStatusWithNotice(LocalType localType,LocalStatus localStatus){
-        localType.status=localStatus;
-        redisHelper.updateLocalTransaction(localType);
-        LocalNotice localNotice=LocalNotice.buildFronLocalType(localType);
-        Message message=new Message(MessageTypeEnum.LocalNotice, JsonUtil.objToJson(localNotice), TimeUtil.getLocalTime());
-        NettyClient.sendMsg(message,true);
-    }
-    private void uploadStatus(LocalType localType, LocalStatus localStatus) {
-        localType.status = localStatus;
-        if (localType.trxId==null){
-            localType.trxId=LocalTransactionManager.getTransactionId(ThreadContext.connetion.get());
-        }
-        redisHelper.updateLocalTransaction(localType);
-    }
+
 }

@@ -4,7 +4,7 @@ import com.lgzClient.utils.TimeUtil;
 import lombok.Data;
 
 import java.util.UUID;
-
+//本地事务的信息 存储在redis中
 @Data
 public class LocalType {
     public static String generateGlobalId(){

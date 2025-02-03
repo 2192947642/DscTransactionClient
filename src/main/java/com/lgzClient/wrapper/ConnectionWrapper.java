@@ -18,7 +18,13 @@ public class ConnectionWrapper implements Connection {
     public ConnectionWrapper(Connection targetConnection) {
         this.targetConnection = targetConnection;
     }
-
+    public Statement createStatementWithoutWrapper() throws SQLException {
+        return targetConnection.createStatement();
+    }
+    public PreparedStatement prepareStatementWithoutWrapper(String sql) throws SQLException {
+        // 在创建 PreparedStatement 之前添加额外操作
+        return targetConnection.prepareStatement(sql);
+    }
     @Override
     public Statement createStatement() throws SQLException {
         // 在创建 Statement 之前添加额外操作

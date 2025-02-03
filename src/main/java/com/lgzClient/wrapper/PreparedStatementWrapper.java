@@ -25,7 +25,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
         this.sqlUtil=new SqlUtil();
         String selectSql=sqlUtil.buildSelectSql(sql);
         this.sql=sql;
-        this.selectStatement=ThreadContext.recodeConnection.get().prepareStatement(selectSql);
+        this.selectStatement=preparedStatement.getConnection().prepareStatement(selectSql);
         this.batchSqls=new ArrayList<>();
     }
 

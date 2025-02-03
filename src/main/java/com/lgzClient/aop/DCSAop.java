@@ -3,10 +3,7 @@ package com.lgzClient.aop;
 import com.lgzClient.NettyClient;
 import com.lgzClient.redis.TransactSqlRedisHelper;
 import com.lgzClient.service.LocalTransactionManager;
-import com.lgzClient.types.LocalNotice;
-import com.lgzClient.types.LocalType;
-import com.lgzClient.types.Message;
-import com.lgzClient.types.ThreadContext;
+import com.lgzClient.types.*;
 import com.lgzClient.types.status.DCSHeaders;
 import com.lgzClient.types.status.LocalStatus;
 import com.lgzClient.types.status.MessageTypeEnum;
@@ -39,19 +36,7 @@ public class DCSAop {
 
      @Pointcut("@annotation(com.lgzClient.annotations.DCSTransaction)")
      public void dscPoint(){};
-     private void updateStatusWithNotice(LocalType localType, LocalStatus localStatus){
-          updateStatus(localType,localStatus);
-          LocalNotice localNotice=LocalNotice.buildFronLocalType(localType);
-          Message message=new Message(MessageTypeEnum.LocalNotice, JsonUtil.objToJson(localNotice), TimeUtil.getLocalTime());
-          NettyClient.sendMsg(message,true);
-     }
-     private void updateStatus(LocalType localType,LocalStatus localStatus){
-          localType.status=localStatus;
-          if(localType.trxId==null){
-               localType.trxId=LocalTransactionManager.getTransactionId(ThreadContext.connetion.get());
-          }
-          redisHelper.updateLocalTransaction(localType);
-     }
+
 
      @Around("dscPoint()")
      public Object dscAround(ProceedingJoinPoint joinPoint) throws Throwable {
@@ -68,11 +53,15 @@ public class DCSAop {
                     redisHelper.addBranchTransaction(localType);//向redis中添加该本地事务
                     Object[] args=joinPoint.getArgs();
                     Object res=joinPoint.proceed(args);
-                    updateStatusWithNotice(localType,LocalStatus.success);
+                    localType.status=LocalStatus.success;
+                    LocalLog localLog=LocalLog.buildFromLocalType(localType);
+                    localTransactionManager.addLogToDatabase(localLog);//本地事务执行成功后在向服务端发送成功通知前 将其写入到数据库中
+                    localTransactionManager.updateStatusWithNotice(localType,LocalStatus.success);//向服务端发送成功通知
+                    localLog.buildFromLocalType(localType);
                     return res;
                }catch (Throwable e){
-                    localTransactionManager.rollBack(localType);
-                    updateStatusWithNotice(localType,LocalStatus.fail);//执行失败
+                    localTransactionManager.rollBack(localType);//出现错误直接进行回滚
+                    localTransactionManager.updateStatusWithNotice(localType,LocalStatus.fail);//执行失败
                     throw  e;
                }finally {
                     TransactionSynchronizationManager.clear();

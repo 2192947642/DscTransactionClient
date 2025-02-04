@@ -17,7 +17,9 @@ public class LocalLog {
         localLog.logs= JsonUtil.objToJson(ThreadContext.sqlRecodes.get());
         return localLog;
     };
-
+    public String applicationName;//微服务的名称
+    public String serverAddress;//该项目的运行地址
+    public String requestUri;//请求的路径
     public Long trxId;
     public String localId;
     public String globalId;

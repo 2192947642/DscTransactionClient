@@ -5,12 +5,15 @@ import com.lgzClient.wrapper.PreparedStatementWrapper;
 import com.mysql.cj.xdevapi.PreparableStatement;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.insert.Insert;
+import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
+import net.sf.jsqlparser.statement.select.SelectItem;
 import net.sf.jsqlparser.statement.update.Update;
 
 import java.lang.reflect.Field;
@@ -23,18 +26,77 @@ import java.util.List;
 
 
 public class SqlUtil {
+    private static String convertToSelect(String sql) throws JSQLParserException {
+        // 解析 SQL 语句
+        Statement statement = CCJSqlParserUtil.parse(sql);
+        if(statement instanceof Select){
+            return sql;
+        }
+        if(statement instanceof Insert){
+            return "";
+        }
+        if (statement instanceof Update) {
+            // 处理 UPDATE 语句
+            return convertUpdateToSelect((Update) statement);
+        } else if (statement instanceof Delete) {
+            // 处理 DELETE 语句
+            return convertDeleteToSelect((Delete) statement);
+        }
+        return "";
+    }
+
+    /**
+     * 将 UPDATE 语句转换为 SELECT 语句
+     *
+     * @param updateStatement UPDATE 语句对象
+     * @return 转换后的 SELECT 语句
+     */
+    private static String convertUpdateToSelect(Update updateStatement) {
+        // 提取列名（UPDATE 语句中设置的列）
+        List<SelectItem<?>> selectItems = new ArrayList<>();
+        for (Column column : updateStatement.getColumns()) {
+            selectItems.add(new SelectItem<>(column));
+        }
+
+        // 提取 WHERE 条件
+        Expression whereClause = updateStatement.getWhere();
+
+        // 构建 SELECT 语句
+        PlainSelect select = new PlainSelect();
+        select.setSelectItems(selectItems);
+        select.setFromItem(updateStatement.getTable());
+        select.setWhere(whereClause);
+        return select.toString();
+    }
+
+    /**
+     * 将 DELETE 语句转换为 SELECT 语句
+     *
+     * @param deleteStatement DELETE 语句对象
+     * @return 转换后的 SELECT 语句
+     */
+     private static String convertDeleteToSelect(Delete deleteStatement) {
+        // 提取 WHERE 条件
+        Expression whereClause = deleteStatement.getWhere();
+        // 构建 SELECT 语句（选择所有列）
+        PlainSelect select = new PlainSelect();
+        select.addSelectItems(new SelectItem<>(new Column("*")));
+        select.setFromItem(deleteStatement.getTable());
+        select.setWhere(whereClause);
+        return select.toString();
+    }
      public SqlType getSqlType(String sql){
         try{
             Statement statement= CCJSqlParserUtil.parse(sql);
-            if(statement instanceof Update update){
+            if(statement instanceof Update){
                 return SqlType.update;
             }
-            else if(statement instanceof Delete delete){
+            else if(statement instanceof Delete){
                 return SqlType.delete;
             }
-            else if(statement instanceof Insert insert){
+            else if(statement instanceof Insert){
                 return SqlType.insert;
-            }else if(statement instanceof Select select){
+            }else if(statement instanceof Select){
                 return SqlType.select;
             }
         }catch (Exception e){
@@ -42,27 +104,10 @@ public class SqlUtil {
         }
         return null;
     }
-     public String buildSelectSql(String sql)  {
-         try{
-             Statement statement= CCJSqlParserUtil.parse(sql);
 
-             Expression where=null;
-             Table table=null;
-             if(statement instanceof Update update){
-               //  System.out.println(update.getUpdateSet(0).getColumns());
-                 where=update.getWhere();
-                 table=update.getTable();
-             }
-             else if(statement instanceof Delete delete){
-                 where=delete.getWhere();
-                 table=delete.getTable();
-             }
-             StringBuilder stringBuilder=new StringBuilder();
-             stringBuilder.append("select * from ").append(table.getName());
-             if(where!=null){
-                 stringBuilder.append(" where ").append(where);
-             }
-             return stringBuilder.toString();
+     public String buildSelectSql(String sql)  {
+         try {
+             return convertToSelect(sql);
          }catch (Exception e){
              throw new RuntimeException(e);
          }

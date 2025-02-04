@@ -1,7 +1,9 @@
 package com.lgzClient.types;
 
 import com.lgzClient.utils.AddressUtil;
+import lombok.Data;
 
+@Data
 public class ServerAddress {
 
     public static ServerAddress buildServerAddress(String ip,String port)
@@ -14,5 +16,5 @@ public class ServerAddress {
     public ServerAddress(){
 
     }
-    public String serverAddress;
+    private String serverAddress;
 }

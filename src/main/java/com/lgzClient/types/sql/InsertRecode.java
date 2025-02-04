@@ -1,12 +1,18 @@
 package com.lgzClient.types.sql;
 
-import java.util.ArrayList;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class InsertRecode {
     public InsertRecode(String sql){
         this.sql=sql;
     }
-    public String sql;
-    public SqlType sqlType=SqlType.insert;
-    public ArrayList<Integer> generatedKeys=new ArrayList<>();//生成的主键
+    private String sql;
+    private SqlType sqlType=SqlType.insert;
+    private ArrayList<Integer> generatedKeys=new ArrayList<>();//生成的主键
 }

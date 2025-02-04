@@ -19,9 +19,9 @@ public class Message {
         this.sendTime=sendTime;
         this.lastSendTime=sendTime;
     }
-    public String msgId;
-    public MessageTypeEnum type;
-    public String content;
-    public String sendTime;
-    public String lastSendTime;
+    private String msgId;
+    private MessageTypeEnum type;
+    private String content;
+    private String sendTime;
+    private String lastSendTime;
 }

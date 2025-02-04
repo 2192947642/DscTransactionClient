@@ -35,12 +35,12 @@ public class TractSqlReSendService {
         while(true){
             Message message=blockingDeque.poll();//将第一个消息从队列中取出
             if(message==null) break;
-            boolean isReceive=msgReceiveHelper.getMessageReceive(message.msgId);//通过message的id判断当前的服务端是否收到了该消息
+            boolean isReceive=msgReceiveHelper.getMessageReceive(message.getMsgId());//通过message的id判断当前的服务端是否收到了该消息
             if(isReceive){//如果是收到了消息,则删除该消息确认
-                msgReceiveHelper.deleteMessageReceive(message.msgId);
+                msgReceiveHelper.deleteMessageReceive(message.getMsgId());
             }
             else{//如果没有收到消息 那么就判断是否满足再次发送的条件
-                String lastSendTime=message.lastSendTime;
+                String lastSendTime= message.getLastSendTime();
                 if(TimeUtil.getPastSeconds(now,lastSendTime)>=reSendInterval){//如果当前到达了重发的时间间隔那么进行重发
                     message.setLastSendTime(now);
                     NettyClient.sendMsg(message,true);

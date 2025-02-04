@@ -1,10 +1,17 @@
 package com.lgzClient.types.sql;
 
-public class DeleteRecode {
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class DeleteRecode   {
     public DeleteRecode(String sql){
         this.sql=sql;
     }
-    public String sql;
-    public String before;
-    public SqlType sqlType=SqlType.delete;
+    private String sql;
+    private String before;
+    private SqlType sqlType=SqlType.delete;
 }

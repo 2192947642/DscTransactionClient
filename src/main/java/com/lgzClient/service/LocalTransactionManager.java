@@ -50,9 +50,9 @@ public  class LocalTransactionManager {
         TransactSqlRedisHelper redisHelper;
         //修改存储在redis中的本地事务状态
         public void updateStatus(LocalType localType, LocalStatus localStatus) {
-             localType.status = localStatus;
-             if (localType.trxId==null){
-                 localType.trxId=LocalTransactionManager.getTransactionId(ThreadContext.connetion.get());
+             localType.setStatus(localStatus);
+             if (localType.getTrxId() ==null){
+                 localType.setTrxId(LocalTransactionManager.getTransactionId(ThreadContext.connetion.get()));
              }
              redisHelper.updateLocalTransaction(localType);
          }
@@ -70,7 +70,7 @@ public  class LocalTransactionManager {
             connection.setAutoCommit(false);
             ConnectionHolder connectionHolder=new ConnectionHolder(connection);
             TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(),connectionHolder);
-            localTransactionMaps.put(localType.localId,connection);
+            localTransactionMaps.put(localType.getLocalId(),connection);
             return connection;
         }
 
@@ -80,32 +80,32 @@ public  class LocalTransactionManager {
         }
         //回滚事务
         public void rollBack(LocalType localType) throws SQLException {
-            Connection connection=getLocalTransaction(localType.localId);
+            Connection connection=getLocalTransaction(localType.getLocalId());
             if (connection==null) return;//如果连接为null 那么说明已经被操作了
             try {
                 connection.rollback();
-                transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.globalId,localType.localId);
+                transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.getGlobalId(), localType.getLocalId());
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             } finally {
                 connection.close();
-                localTransactionMaps.remove(localType.localId);
+                localTransactionMaps.remove(localType.getLocalId());
             }
 
         }
         //提交事务
         public void commit(LocalType localType) throws SQLException {
-            ConnectionWrapper connection=getLocalTransaction(localType.localId);
+            ConnectionWrapper connection=getLocalTransaction(localType.getLocalId());
             if (connection==null) return;
             try {
-                LocalTransactionManager.instance.deleteFromDatabase(connection,localType.globalId,localType.localId);
+                LocalTransactionManager.instance.deleteFromDatabase(connection, localType.getGlobalId(), localType.getLocalId());
                 connection.commit();
-                transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.globalId,localType.localId);
+                transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.getGlobalId(), localType.getLocalId());
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             } finally {
                 connection.close();
-                localTransactionMaps.remove(localType.localId);
+                localTransactionMaps.remove(localType.getLocalId());
             }
         }
     public void addLogToDatabase(LocalLog localLog) throws SQLException {

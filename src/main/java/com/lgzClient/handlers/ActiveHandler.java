@@ -15,7 +15,7 @@ public class ActiveHandler extends ChannelInboundHandlerAdapter {
         String ip=AddressUtil.getIp();
         String address=AddressUtil.buildAddress(ip);
         ServerAddress serverAddress=new ServerAddress();
-        serverAddress.serverAddress=address;
+        serverAddress.setServerAddress(address);
         Message message=new Message(MessageTypeEnum.ServerAddress, JsonUtil.objToJson(serverAddress),TimeUtil.getLocalTime());
         ctx.channel().writeAndFlush(JsonUtil.objToJson(message));
     }

@@ -23,7 +23,7 @@ public class TransactSqlRedisHelper {
     StringRedisTemplate stringRedisTemplate;
 
     public void addBranchTransaction(LocalType globalTransaction){
-        stringRedisTemplate.opsForHash().put(globalTransaction.globalId,globalTransaction.localId,JsonUtil.objToJson(globalTransaction));
+        stringRedisTemplate.opsForHash().put(globalTransaction.getGlobalId(), globalTransaction.getLocalId(),JsonUtil.objToJson(globalTransaction));
     }
     public void updateGlobalStatus(String globalId, GlobalStatus status){
         stringRedisTemplate.opsForHash().put(globalId,"status",JsonUtil.objToJson(status));
@@ -47,10 +47,10 @@ public class TransactSqlRedisHelper {
             globalStatus=null;
             for(String key:typeMaps.keySet()){
                 LocalType localType=typeMaps.get(key);
-                if(localType.status== LocalStatus.wait){
+                if(localType.getStatus() == LocalStatus.wait){
                     globalStatus=GlobalStatus.wait;
                 }
-                else if(localType.status== LocalStatus.fail){
+                else if(localType.getStatus() == LocalStatus.fail){
                     globalStatus=GlobalStatus.fail;
                 }
             }
@@ -65,9 +65,9 @@ public class TransactSqlRedisHelper {
 
     //修改redis中本地的事务状态
     public void updateLocalTransaction(LocalType localType){
-        if(stringRedisTemplate.opsForHash().hasKey(localType.globalId,localType.localId)){
+        if(stringRedisTemplate.opsForHash().hasKey(localType.getGlobalId(), localType.getLocalId())){
 
-            stringRedisTemplate.opsForHash().put(localType.globalId,localType.localId,JsonUtil.objToJson(localType));
+            stringRedisTemplate.opsForHash().put(localType.getGlobalId(), localType.getLocalId(),JsonUtil.objToJson(localType));
         }
     }
     //删除redis中本地的事务记录

@@ -5,16 +5,20 @@ import com.lgzClient.redis.TransactSqlRedisHelper;
 import com.lgzClient.types.*;
 import com.lgzClient.types.status.LocalStatus;
 import com.lgzClient.types.status.MessageTypeEnum;
+import com.lgzClient.utils.AddressUtil;
 import com.lgzClient.utils.JsonUtil;
+import com.lgzClient.utils.RequestUtil;
 import com.lgzClient.utils.TimeUtil;
 import com.lgzClient.wrapper.ConnectionWrapper;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.net.UnknownHostException;
 import java.sql.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,7 +28,6 @@ public  class LocalTransactionManager {
         TransactSqlRedisHelper transactSqlRedisHelper;
         @Autowired
         DataSourceTransactionManager transactionManager;
-
         public static LocalTransactionManager instance;
         //获得事务的id
         public static  Long getTransactionId(Connection connection){
@@ -48,6 +51,15 @@ public  class LocalTransactionManager {
         private static final ConcurrentHashMap<String, ConnectionWrapper> localTransactionMaps=new ConcurrentHashMap<>();
         @Autowired
         TransactSqlRedisHelper redisHelper;
+        public void begin(String globalId) throws SQLException, UnknownHostException {
+                HttpServletRequest httpServletRequest= RequestUtil.instance.getRequest();
+                LocalType localType=new LocalType(globalId,AddressUtil.buildAddress(AddressUtil.getIp()));//如果存在globalId那么就是加入到一个分布式事务中,不存在那么就生成一个新的globalId
+                ThreadContext.globalId.set(localType.getGlobalId());//将该全局事务的id添加到当前的线程中
+                ThreadContext.isDscTransaction.set(true);
+                ThreadContext.localType.set(localType);
+                this.buildLocalTransaction(localType);//创建一个本地事务.并将其与本地事务关联
+                redisHelper.addBranchTransaction(localType);//向redis中添加该本地事务
+        }
         //修改存储在redis中的本地事务状态
         public void updateStatus(LocalType localType, LocalStatus localStatus) {
              localType.setStatus(localStatus);
@@ -63,7 +75,15 @@ public  class LocalTransactionManager {
              Message message=new Message(MessageTypeEnum.LocalNotice, JsonUtil.objToJson(localNotice), TimeUtil.getLocalTime());
              NettyClient.sendMsg(message,true);
         }
-        public Connection buildLocalTransaction(LocalType localType) throws  SQLException//新建一个本地事务,并将其绑定到当前的线程中
+        public void updateStatus(LocalStatus localStatus){
+            LocalType localType=ThreadContext.localType.get();
+            updateStatus(localType,localStatus);
+        }
+        public void updateStatusWithNotice(LocalStatus localStatus){
+            LocalType localType=ThreadContext.localType.get();
+             updateStatusWithNotice(localType,localStatus);
+        }
+        private Connection buildLocalTransaction(LocalType localType) throws  SQLException//新建一个本地事务,并将其绑定到当前的线程中
         {
             ConnectionWrapper connection=new ConnectionWrapper(transactionManager.getDataSource().getConnection());
             ThreadContext.connetion.set(connection);
@@ -108,7 +128,7 @@ public  class LocalTransactionManager {
                 localTransactionMaps.remove(localType.getLocalId());
             }
         }
-    public void addLogToDatabase(LocalLog localLog) throws SQLException {
+        public void addLogToDatabase(LocalLog localLog) throws SQLException {
         String sql = "insert into transact_sql_log(trx_id,global_id, local_id, begin_time, status, logs) values (?, ?, ?, ?, ?, ?)";
         Connection connection = null;
         PreparedStatement preparedStatement = null;
@@ -143,7 +163,7 @@ public  class LocalTransactionManager {
             }
         }
     }
-    public void deleteFromDatabase(ConnectionWrapper connection,String globalId,String localId) throws SQLException {
+        public void deleteFromDatabase(ConnectionWrapper connection,String globalId,String localId) throws SQLException {
         String sql = "delete from transact_sql_log where global_id = ? and local_id = ?";
         PreparedStatement preparedStatement = null;
         try {

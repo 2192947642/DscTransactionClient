@@ -4,7 +4,6 @@ import com.lgzClient.service.LocalTransactionManager;
 import com.lgzClient.types.LocalLog;
 import com.lgzClient.types.LocalType;
 import com.lgzClient.types.ThreadContext;
-import com.lgzClient.types.status.DCSAttributes;
 import com.lgzClient.types.status.LocalStatus;
 import com.lgzClient.utils.JsonUtil;
 import com.lgzClient.utils.RequestUtil;
@@ -33,11 +32,7 @@ public class DCSResponseAdvice implements ResponseBodyAdvice<Object> {
     LocalTransactionManager localTransactionManager;
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-        HttpServletRequest httpServletRequest= RequestUtil.instance.getRequest();
-        if(httpServletRequest.getAttribute(DCSAttributes.isDscTransaction).equals(true)){
-            return true;
-        }
-        return false;
+        return ThreadContext.isDscTransaction.get()==true;
     }
 
     @Override

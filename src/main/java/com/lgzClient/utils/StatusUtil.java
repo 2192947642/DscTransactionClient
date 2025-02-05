@@ -10,6 +10,7 @@ public class StatusUtil {
         String globalId= httpServletRequest.getHeader(DCSHeaders.globalId);//获得全局事务id
         return !StringUtils.hasLength(globalId);
     }
+
     public boolean isBegin(){
         HttpServletRequest httpServletRequest=RequestUtil.instance.getRequest();
         return isBegin(httpServletRequest);

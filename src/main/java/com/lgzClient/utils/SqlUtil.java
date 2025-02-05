@@ -17,11 +17,9 @@ import net.sf.jsqlparser.statement.select.SelectItem;
 import net.sf.jsqlparser.statement.update.Update;
 
 import java.lang.reflect.Field;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 
@@ -157,6 +155,24 @@ public class SqlUtil {
         }
         return finalSql.toString();
     }
+     public String getResultSetJson(ResultSet resultSet) throws SQLException {
+        ResultSetMetaData metaData=resultSet.getMetaData();
+        int columnCount=metaData.getColumnCount();
+        ArrayList<HashMap<String,String>> resultList=new ArrayList<>();
+        while(resultSet.next()){
+            HashMap hashMap=new HashMap();
+            for(int i=1;i<=columnCount;i++){
+                String columnName=metaData.getColumnName(i);
+                Object value= resultSet.getObject(columnName);
+                String strValue="";
+                if(!(value instanceof String)) strValue=JsonUtil.objToJson(value);
+                else if(value instanceof String str) strValue=str;
+                hashMap.put(columnName,strValue);
+            }
+            resultList.add(hashMap);
+        }
+        return JsonUtil.objToJson(resultList);
+     }
      public static void main(String [] args){
          SqlUtil sqlUtil=new SqlUtil();
          String sql="update user set name='lgz' where id=?";

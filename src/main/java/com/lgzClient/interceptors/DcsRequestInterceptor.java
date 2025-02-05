@@ -3,14 +3,9 @@ package com.lgzClient.interceptors;
 import com.alibaba.nacos.common.utils.StringUtils;
 import com.lgzClient.redis.TransactSqlRedisHelper;
 import com.lgzClient.service.LocalTransactionManager;
-import com.lgzClient.types.LocalLog;
-import com.lgzClient.types.LocalType;
 import com.lgzClient.types.ThreadContext;
 
 import com.lgzClient.types.status.DCSHeaders;
-import com.lgzClient.types.status.LocalStatus;
-import com.lgzClient.utils.AddressUtil;
-import com.lgzClient.utils.RequestUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;

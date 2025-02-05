@@ -68,18 +68,19 @@ public  class LocalTransactionManager {
              }
              redisHelper.updateLocalTransaction(localType);
          }
-        public void updateStatusWithNotice(LocalType localType, LocalStatus localStatus){
+        public void updateStatusWithNotice(LocalType localType, LocalStatus localStatus) throws InterruptedException {
 
-            updateStatus(localType,localStatus);
+             updateStatus(localType,localStatus);
              LocalNotice localNotice=LocalNotice.buildFronLocalType(localType);
              Message message=new Message(MessageTypeEnum.LocalNotice, JsonUtil.objToJson(localNotice), TimeUtil.getLocalTime());
+
              NettyClient.sendMsg(message,true);
         }
         public void updateStatus(LocalStatus localStatus){
             LocalType localType=ThreadContext.localType.get();
             updateStatus(localType,localStatus);
         }
-        public void updateStatusWithNotice(LocalStatus localStatus){
+        public void updateStatusWithNotice(LocalStatus localStatus) throws InterruptedException {
             LocalType localType=ThreadContext.localType.get();
              updateStatusWithNotice(localType,localStatus);
         }
@@ -128,20 +129,22 @@ public  class LocalTransactionManager {
                 localTransactionMaps.remove(localType.getLocalId());
             }
         }
-        public void addLogToDatabase(LocalLog localLog) throws SQLException {
-        String sql = "insert into transact_sql_log(trx_id,global_id, local_id, begin_time, status, logs) values (?, ?, ?, ?, ?, ?)";
+        public void addLogToDatabase(TransactSqlLog transactSqlLog) throws SQLException {
+        String sql = "insert into transact_sql_log(trx_id,global_id, local_id, begin_time, request_uri,application_name,server_address,logs) values ( ? , ? , ? , ?, ?, ?, ?, ?)";
         Connection connection = null;
         PreparedStatement preparedStatement = null;
         try {
             connection = transactionManager.getDataSource().getConnection();
             preparedStatement = connection.prepareStatement(sql);
             // 设置参数
-            preparedStatement.setLong(1, localLog.getTrxId());
-            preparedStatement.setString(2, localLog.getGlobalId());
-            preparedStatement.setString(3, localLog.getLocalId());
-            preparedStatement.setTimestamp(4, new Timestamp(TimeUtil.strToDate(localLog.getBeginTime()).getTime()));
-            preparedStatement.setString(5, JsonUtil.objToJson(localLog.getStatus()));
-            preparedStatement.setString(6, localLog.getLogs());
+            preparedStatement.setLong(1, transactSqlLog.getTrxId());
+            preparedStatement.setString(2, transactSqlLog.getGlobalId());
+            preparedStatement.setString(3, transactSqlLog.getLocalId());
+            preparedStatement.setTimestamp(4, new Timestamp(TimeUtil.strToDate(transactSqlLog.getBeginTime()).getTime()));
+            preparedStatement.setString(5, transactSqlLog.getRequestUri());
+            preparedStatement.setString(6, transactSqlLog.getApplicationName());
+            preparedStatement.setString(7, transactSqlLog.getServerAddress());
+            preparedStatement.setString(8, transactSqlLog.getLogs());
             // 执行插入操作
             preparedStatement.executeUpdate();
         } catch (SQLException e) {

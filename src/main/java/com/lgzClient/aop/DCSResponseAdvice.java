@@ -1,18 +1,13 @@
 package com.lgzClient.aop;
 
 import com.lgzClient.service.LocalTransactionManager;
-import com.lgzClient.types.LocalLog;
+import com.lgzClient.types.TransactSqlLog;
 import com.lgzClient.types.LocalType;
 import com.lgzClient.types.ThreadContext;
 import com.lgzClient.types.status.LocalStatus;
-import com.lgzClient.utils.JsonUtil;
-import com.lgzClient.utils.RequestUtil;
-import com.lgzClient.utils.SqlUtil;
-import com.lgzClient.utils.StatusUtil;
-import jakarta.servlet.http.HttpServletRequest;
+import com.lgzClient.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -26,8 +21,8 @@ import java.sql.SQLException;
 @Slf4j
 @ControllerAdvice
 public class DCSResponseAdvice implements ResponseBodyAdvice<Object> {
-    @Value("spring.application.name")
-    public String applicationName;
+    @Autowired
+    LocalLogUtil localLogUtil;
     @Autowired
     LocalTransactionManager localTransactionManager;
     @Override
@@ -44,11 +39,8 @@ public class DCSResponseAdvice implements ResponseBodyAdvice<Object> {
                 localTransactionManager.updateStatusWithNotice(localType, LocalStatus.fail);//通知服务端本地事务执行失败了
             }
             else {//如果没有抛出异常,那么进行提交
-                LocalLog localLog=LocalLog.buildFromLocalType(localType);
-                localLog.setStatus(LocalStatus.success);
-                localLog.setApplicationName(applicationName);
-                localLog.setLogs(JsonUtil.objToJson(ThreadContext.sqlRecodes.get()));
-                localTransactionManager.addLogToDatabase(localLog);//将localLog添加到数据库中
+                TransactSqlLog transactSqlLog =localLogUtil.buildLocalLogByThread();//建立localLog
+                localTransactionManager.addLogToDatabase(transactSqlLog);//将localLog添加到数据库中
                 if(StatusUtil.instance.isBegin()){//如果是分布式事务的发起者 那么通知全局事务成功
                     localTransactionManager.updateStatusWithNotice(localType, LocalStatus.success);
                 }else{
@@ -57,6 +49,8 @@ public class DCSResponseAdvice implements ResponseBodyAdvice<Object> {
             }
         }catch (SQLException sqlException){
             throw new RuntimeException(sqlException);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
         return body;
     }

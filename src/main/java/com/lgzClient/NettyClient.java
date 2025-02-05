@@ -1,5 +1,6 @@
 package com.lgzClient;
 
+import com.lgzClient.exceptions.DcsTransactionError;
 import com.lgzClient.service.TractSqlReSendService;
 import com.lgzClient.types.Message;
 import com.lgzClient.utils.Emitter;
@@ -25,7 +26,7 @@ public class NettyClient {
     private static final ConcurrentHashMap<String,NettyClient> clientMaps=new ConcurrentHashMap<>();
     private static int number=0;//轮询发送消息
     //发送消息
-    public static void sendMsg(Message message,boolean addToResendQueue){
+    public static void sendMsg(Message message,boolean addToResendQueue) throws InterruptedException {
        NettyClient client= getActiveNettyClientByPoll();
        client.sendMessage(message,addToResendQueue);//发送消息
     };
@@ -54,14 +55,16 @@ public class NettyClient {
     private Channel connection;
     private final String ip;//要连接的服务端的ip
     private final int port;//要连接的服务段的port
-    public void sendMessage(Message msg,boolean addToResendQueue){
+    public void sendMessage(Message msg,boolean addToResendQueue) throws InterruptedException {
         if(msg==null||connection==null){
             return;
         }
-        String str=JsonUtil.objToJson(msg);
-        connection.writeAndFlush(str);
-        if (addToResendQueue)
-        TractSqlReSendService.instance.addToResendQueue(msg);//添加到重新上传
+       String str=JsonUtil.objToJson(msg);
+       ChannelFuture channelFuture=connection.writeAndFlush(str);
+       if(!channelFuture.sync().isSuccess()) {
+           throw new DcsTransactionError("发送消息给客户端失败");
+       }
+        if (addToResendQueue) TractSqlReSendService.instance.addToResendQueue(msg);//添加到重新上传
     }
 
     private NettyClient(String ip,int port){

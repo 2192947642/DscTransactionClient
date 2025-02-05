@@ -8,6 +8,7 @@ import java.util.Objects;
 
 public class RequestUtil {
     public static final RequestUtil instance=new RequestUtil();
+
    public HttpServletRequest getRequest(){
      return ((ServletRequestAttributes) Objects.requireNonNull(RequestContextHolder.getRequestAttributes())).getRequest();
    }

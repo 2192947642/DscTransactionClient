@@ -89,8 +89,9 @@ public  class LocalTransactionManager {
              branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//修改分支事务的状
          }
         public void updateStatusWithNotice(LocalType localType, LocalStatus localStatus) throws InterruptedException {
-           localType.setStatus(localStatus);
+            localType.setStatus(localStatus);
             BranchTransaction branchTransaction=new BranchTransaction();
+            branchTransaction.setGlobalId(localType.getGlobalId());
             branchTransaction.setLocalId(localType.getLocalId());
             branchTransaction.setStatus(localStatus);
             branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);
@@ -119,33 +120,31 @@ public  class LocalTransactionManager {
            return localTransactionMaps.get(localId);
         }
         //回滚事务
-        public void rollBack(LocalType localType) throws SQLException {
-            Connection connection=getLocalTransaction(localType.getLocalId());
+        public void rollBack(String localId) throws SQLException {
+            Connection connection=getLocalTransaction(localId);
             if (connection==null) return;//如果连接为null 那么说明已经被操作了
             try {
                 connection.rollback();
-                transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.getGlobalId(), localType.getLocalId());
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             } finally {
                 connection.close();
-                localTransactionMaps.remove(localType.getLocalId());
+                localTransactionMaps.remove(localId);
             }
 
         }
         //提交事务
-        public void commit(LocalType localType) throws SQLException {
-            ConnectionWrapper connection=getLocalTransaction(localType.getLocalId());
+        public void commit(String localId ) throws SQLException {
+            ConnectionWrapper connection=getLocalTransaction(localId);
             if (connection==null) return;
             try {
-                LocalTransactionManager.instance.deleteFromDatabase(connection, localType.getLocalId());
+                LocalTransactionManager.instance.deleteFromDatabase(connection,localId);
                 connection.commit();
-                transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.getGlobalId(), localType.getLocalId());
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             } finally {
                 connection.close();
-                localTransactionMaps.remove(localType.getLocalId());
+                localTransactionMaps.remove(localId);
             }
         }
         public void addLogToDatabase(TransactSqlLog transactSqlLog) throws SQLException {
@@ -198,6 +197,6 @@ public  class LocalTransactionManager {
                  // 记录日志或其他处理逻辑
                  throw new SQLException("Error deleting log from database", e);
              }
-    }
-
+        }
 }
+

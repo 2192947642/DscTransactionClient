@@ -35,7 +35,7 @@ public class DCSResponseAdvice implements ResponseBodyAdvice<Object> {
         LocalType localType=(LocalType) RequestUtil.instance.getRequest().getAttribute("localType");
         try{
             if(ThreadContext.error.get()!=null){//如果抛出了异常 那么就进行回滚
-                localTransactionManager.rollBack(localType);//回滚本地事务
+                localTransactionManager.rollBack(localType.getLocalId());//回滚本地事务
                 localTransactionManager.updateStatusWithNotice(localType, LocalStatus.fail);//通知服务端本地事务执行失败了
             }
             else {//如果没有抛出异常,那么进行提交

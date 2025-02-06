@@ -1,7 +1,6 @@
 package com.lgzClient.aop;
 
 import com.lgzClient.NettyClient;
-import com.lgzClient.redis.TransactSqlRedisHelper;
 import com.lgzClient.service.LocalTransactionManager;
 import com.lgzClient.types.*;
 import com.lgzClient.types.status.DCSHeaders;
@@ -24,8 +23,6 @@ import org.springframework.util.StringUtils;
 @Aspect
 @Slf4j
 public class DCSAop {
-     @Autowired
-     TransactSqlRedisHelper redisHelper;
      @Autowired
      LocalTransactionManager localTransactionManager;//本地事务管理器
      @Pointcut("@annotation(com.lgzClient.annotations.DCSTransaction)")

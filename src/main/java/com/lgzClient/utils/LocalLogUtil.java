@@ -13,16 +13,13 @@ import java.util.HashMap;
 
 @Component
 public class LocalLogUtil {
-    @Value("spring.application.name")
-    public String applicationName;
-
     public TransactSqlLog buildLocalLogFromLocalType(LocalType localType){
         TransactSqlLog transactSqlLog =new TransactSqlLog();
         transactSqlLog.setTrxId(localType.getTrxId());
         transactSqlLog.setLocalId(localType.getLocalId());
         transactSqlLog.setGlobalId(localType.getGlobalId());
         transactSqlLog.setBeginTime(localType.getBeginTime());
-        transactSqlLog.setApplicationName(applicationName);
+        transactSqlLog.setApplicationName(localType.getApplicationName());
         transactSqlLog.setServerAddress(localType.getServerAddress());
         return transactSqlLog;
     };

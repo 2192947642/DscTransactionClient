@@ -1,7 +1,6 @@
 package com.lgzClient.interceptors;
 
 import com.alibaba.nacos.common.utils.StringUtils;
-import com.lgzClient.redis.TransactSqlRedisHelper;
 import com.lgzClient.service.LocalTransactionManager;
 import com.lgzClient.types.ThreadContext;
 
@@ -20,8 +19,6 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
     DataSourceTransactionManager dataSourceTransactionManager;
     @Autowired
     LocalTransactionManager localTransactionManager;
-    @Autowired
-    TransactSqlRedisHelper redisHelper;
     private final String DcsPreHandlerOnce="DcsPreHandlerOnce";
     private final String DcsAfterHandlerOnce="DcsAfterHandlerOnce";
     @Override

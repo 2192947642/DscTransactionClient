@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-@Component
+//@Component
 public class TransactSqlRedisHelper {
     @Autowired
     StringRedisTemplate stringRedisTemplate;
@@ -66,12 +66,11 @@ public class TransactSqlRedisHelper {
     //修改redis中本地的事务状态
     public void updateLocalTransaction(LocalType localType){
         if(stringRedisTemplate.opsForHash().hasKey(localType.getGlobalId(), localType.getLocalId())){
-
             stringRedisTemplate.opsForHash().put(localType.getGlobalId(), localType.getLocalId(),JsonUtil.objToJson(localType));
         }
     }
     //删除redis中本地的事务记录
-    public void deleteLocalTransaction(String globalId,String localId ){
+    public void deleteLocalTransaction(String globalId,String localId){
 
         stringRedisTemplate.opsForHash().delete(globalId,localId);
     }

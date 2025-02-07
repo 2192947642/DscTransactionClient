@@ -1,4 +1,4 @@
-package com.lgzClient.types.sql;
+package com.lgzClient.types.sql.recode;
 
 public enum SqlType {
     select,

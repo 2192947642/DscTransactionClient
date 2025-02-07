@@ -1,11 +1,7 @@
 package com.lgzClient.aop;
 
-import com.lgzClient.NettyClient;
 import com.lgzClient.service.LocalTransactionManager;
 import com.lgzClient.types.*;
-import com.lgzClient.types.status.DCSHeaders;
-import com.lgzClient.types.status.LocalStatus;
-import com.lgzClient.types.status.MessageTypeEnum;
 import com.lgzClient.utils.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -14,10 +10,7 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.util.StringUtils;
 
 @Component
 @Aspect

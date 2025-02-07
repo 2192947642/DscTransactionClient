@@ -19,15 +19,16 @@ public class Start {
     Environment environment;
     @Autowired
     private NacosServiceDiscovery nacosServiceDiscovery;
-    private final String serverName="TractSqlService";
+    //查询 在naccos中注册的netty服务
+    private final String serverName="TractSqlServiceNetty";
     @PostConstruct
     public void init() throws NacosException {
        Integer port=environment.getProperty("server.port",Integer.class);
        AddressUtil.initPort(port);//设置端口
        this.startConnect();
     }
-    //每30秒检查一次连接 查看是否有新的 没有连接
-    @Scheduled(cron = "0/10 * * * * ?")
+    //每15秒检查一次连接 查看是否有新的 没有连接
+    @Scheduled(cron = "0/15 * * * * ?")
     public void startConnect() throws NacosException {
         List<ServiceInstance> instances= nacosServiceDiscovery.getInstances(serverName);
         for(ServiceInstance instance :instances){

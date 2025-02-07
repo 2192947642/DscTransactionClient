@@ -1,5 +1,6 @@
-package com.lgzClient.types;
+package com.lgzClient.types.redis;
 
+import com.lgzClient.types.sql.client.UnCommitSqlLog;
 import com.lgzClient.types.status.GlobalStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,5 +14,5 @@ import java.util.Map;
 public class GlobalType {
 
    private GlobalStatus status;
-   private Map<String,LocalType> localTypeMap;
+   private Map<String, UnCommitSqlLog> localTypeMap;
 }

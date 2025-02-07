@@ -1,11 +1,8 @@
 package com.lgzClient.wrapper;
 
 import com.lgzClient.types.ThreadContext;
-import com.lgzClient.types.sql.*;
+import com.lgzClient.types.sql.recode.*;
 import com.lgzClient.utils.SqlUtil;
-import com.mysql.cj.xdevapi.PreparableStatement;
-import com.mysql.cj.xdevapi.SelectStatement;
-import net.sf.jsqlparser.JSQLParserException;
 
 import java.io.InputStream;
 import java.io.Reader;

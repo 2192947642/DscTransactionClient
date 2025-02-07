@@ -1,12 +1,8 @@
 package com.lgzClient.utils;
-import com.lgzClient.types.ThreadContext;
-import com.lgzClient.types.sql.*;
-import com.lgzClient.wrapper.PreparedStatementWrapper;
-import com.mysql.cj.xdevapi.PreparableStatement;
+import com.lgzClient.types.sql.recode.*;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Column;
-import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.delete.Delete;

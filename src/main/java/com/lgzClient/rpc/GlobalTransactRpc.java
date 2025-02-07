@@ -1,7 +1,7 @@
 package com.lgzClient.rpc;
 
 import com.lgzClient.types.Result;
-import com.lgzClient.types.sql.GlobalTransaction;
+import com.lgzClient.types.sql.service.GlobalTransaction;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.ArrayList;
 @Service
-@FeignClient
+@FeignClient("TractSqlServiceServlet")
 public interface GlobalTransactRpc {
     @GetMapping("/globalTransaction")
     Result<GlobalTransaction> getGlobalTransaction(@RequestParam("globalId") String globalId);

@@ -23,8 +23,8 @@ import com.lgzClient.types.LocalNotice;
 import com.lgzClient.types.LocalType;
 import com.lgzClient.types.Message;
 import com.lgzClient.types.ThreadContext;
+import com.lgzClient.types.status.BranchStatus;
 import com.lgzClient.types.status.DCSHeaders;
-import com.lgzClient.types.status.LocalStatus;
 import com.lgzClient.types.status.MessageTypeEnum;
 import com.lgzClient.utils.AddressUtil;
 import com.lgzClient.utils.JsonUtil;
@@ -46,61 +46,65 @@ import org.springframework.util.StringUtils;
 @Aspect
 @Slf4j
 public class DCSAop {
-     @Autowired
-     TransactSqlRedisHelper redisHelper;
-     @Autowired
-     LocalTransactionManager localTransactionManager;//本地事务管理器
-     @Autowired
-     DataSourceTransactionManager dataSourceTransactionManager;
+    @Autowired
+    TransactSqlRedisHelper redisHelper;
+    @Autowired
+    LocalTransactionManager localTransactionManager;//本地事务管理器
+    @Autowired
+    DataSourceTransactionManager dataSourceTransactionManager;
 
-     @Pointcut("@annotation(com.lgzClient.annotations.DCSTransaction)")
-     public void dscPoint(){};
-     private void updateStatusWithNotice(LocalType localType, LocalStatus localStatus){
-          updateStatus(localType,localStatus);
-          LocalNotice localNotice=LocalNotice.buildFronLocalType(localType);
-          Message message=new Message(MessageTypeEnum.LocalNotice, JsonUtil.objToJson(localNotice), TimeUtil.getLocalTime());
-          NettyClient.sendMsg(message,true);
-     }
-     private void updateStatus(LocalType localType,LocalStatus localStatus){
-          localType.status=localStatus;
-          if(localType.trxId==null){
-               localType.trxId=LocalTransactionManager.getTransactionId(ThreadContext.connetion.get());
-          }
-          redisHelper.updateLocalTransaction(localType);
-     }
+    @Pointcut("@annotation(com.lgzClient.annotations.DCSTransaction)")
+    public void dscPoint() {
+    }
 
-     @Around("dscPoint()")
-     public Object dscAround(ProceedingJoinPoint joinPoint) throws Throwable {
-          HttpServletRequest httpServletRequest=RequestUtil.instance.getRequest();
-          String globalId= httpServletRequest.getHeader(DCSHeaders.globalId);//获得全局事务id
-          Boolean isBegin= !StringUtils.hasLength(globalId);//是否是分布式事务的发起者 只有发起者才会向server发送 本地事务完成的通知 其他分支事务都是直接修改redis中的本地事务状态
-          if(isBegin){
-               LocalType localType=null;
-               try {
-                    String serverAddress= AddressUtil.buildAddress(AddressUtil.getIp());
-                    localType=new LocalType(globalId,serverAddress);
-                    ThreadContext.globalId.set(localType.globalId);//将该全局事务的id添加到当前的线程中
-                    localTransactionManager.buildLocalTransaction(localType);//创建一个本地事务.并将其与本地事务关联
-                    redisHelper.addBranchTransaction(localType);//向redis中添加该本地事务
-                    Object[] args=joinPoint.getArgs();
-                    Object res=joinPoint.proceed(args);
-                    updateStatusWithNotice(localType,LocalStatus.success);
-                    return res;
-               }catch (Throwable e){
-                    localTransactionManager.rollBack(localType);
-                    updateStatusWithNotice(localType,LocalStatus.fail);//执行失败
-                    throw  e;
-               }finally {
-                    TransactionSynchronizationManager.clear();
-                    TransactionSynchronizationManager.unbindResource(dataSourceTransactionManager.getDataSource());//解除关联
-               }
-          }
-          else{
-               Object[] args=joinPoint.getArgs();
-               Object res=joinPoint.proceed(args);
-               return res;
-          }
-     }
+    ;
+
+    private void updateStatusWithNotice(LocalType localType, BranchStatus branchStatus) {
+        updateStatus(localType, branchStatus);
+        LocalNotice localNotice = LocalNotice.buildFronLocalType(localType);
+        Message message = new Message(MessageTypeEnum.LocalNotice, JsonUtil.objToJson(localNotice), TimeUtil.getLocalTime());
+        NettyClient.sendMsg(message, true);
+    }
+
+    private void updateStatus(LocalType localType, BranchStatus branchStatus) {
+        localType.status = branchStatus;
+        if (localType.trxId == null) {
+            localType.trxId = LocalTransactionManager.getTransactionId(ThreadContext.connection.get());
+        }
+        redisHelper.updateLocalTransaction(localType);
+    }
+
+    @Around("dscPoint()")
+    public Object dscAround(ProceedingJoinPoint joinPoint) throws Throwable {
+        HttpServletRequest httpServletRequest = RequestUtil.instance.getRequest();
+        String globalId = httpServletRequest.getHeader(DCSHeaders.globalId);//获得全局事务id
+        Boolean isBegin = !StringUtils.hasLength(globalId);//是否是分布式事务的发起者 只有发起者才会向server发送 本地事务完成的通知 其他分支事务都是直接修改redis中的本地事务状态
+        if (isBegin) {
+            LocalType localType = null;
+            try {
+                String serverAddress = AddressUtil.buildAddress(AddressUtil.getIp());
+                localType = new LocalType(globalId, serverAddress);
+                ThreadContext.globalId.set(localType.globalId);//将该全局事务的id添加到当前的线程中
+                localTransactionManager.buildLocalTransaction(localType);//创建一个本地事务.并将其与本地事务关联
+                redisHelper.addBranchTransaction(localType);//向redis中添加该本地事务
+                Object[] args = joinPoint.getArgs();
+                Object res = joinPoint.proceed(args);
+                updateStatusWithNotice(localType, BranchStatus.success);
+                return res;
+            } catch (Throwable e) {
+                localTransactionManager.rollBack(localType);
+                updateStatusWithNotice(localType, BranchStatus.fail);//执行失败
+                throw e;
+            } finally {
+                TransactionSynchronizationManager.clear();
+                TransactionSynchronizationManager.unbindResource(dataSourceTransactionManager.getDataSource());//解除关联
+            }
+        } else {
+            Object[] args = joinPoint.getArgs();
+            Object res = joinPoint.proceed(args);
+            return res;
+        }
+    }
 
 }
 ```
@@ -118,8 +122,8 @@ import com.lgzClient.types.LocalNotice;
 import com.lgzClient.types.LocalType;
 import com.lgzClient.types.Message;
 import com.lgzClient.types.ThreadContext;
+import com.lgzClient.types.status.BranchStatus;
 import com.lgzClient.types.status.DCSHeaders;
-import com.lgzClient.types.status.LocalStatus;
 import com.lgzClient.types.status.MessageTypeEnum;
 import com.lgzClient.utils.AddressUtil;
 import com.lgzClient.utils.JsonUtil;
@@ -141,22 +145,23 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
     LocalTransactionManager localTransactionManager;
     @Autowired
     TransactSqlRedisHelper redisHelper;
-    private final String DcsPreHandlerOnce="DcsPreHandlerOnce";
-    private final String DcsAfterHandlerOnce="DcsAfterHandlerOnce";
+    private final String DcsPreHandlerOnce = "DcsPreHandlerOnce";
+    private final String DcsAfterHandlerOnce = "DcsAfterHandlerOnce";
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        if(request.getAttribute(DcsPreHandlerOnce)!=null){
+        if (request.getAttribute(DcsPreHandlerOnce) != null) {
             return true;
         }
-        if(request.getAttribute(DcsAfterHandlerOnce)!=null){
-            request.setAttribute(DcsPreHandlerOnce,1);
+        if (request.getAttribute(DcsAfterHandlerOnce) != null) {
+            request.setAttribute(DcsPreHandlerOnce, 1);
         }
-        HttpServletRequest httpServletRequest= RequestUtil.instance.getRequest();
-        String globalId= httpServletRequest.getHeader(DCSHeaders.globalId);//获得全局事务id
-        Boolean isBegin=!StringUtils.hasLength(globalId);
-        if(!isBegin){//如果当前是分布式事务调用
+        HttpServletRequest httpServletRequest = RequestUtil.instance.getRequest();
+        String globalId = httpServletRequest.getHeader(DCSHeaders.globalId);//获得全局事务id
+        Boolean isBegin = !StringUtils.hasLength(globalId);
+        if (!isBegin) {//如果当前是分布式事务调用
             ThreadContext.globalId.set(globalId);//设置当前的globalId
-            LocalType localType= new LocalType(globalId, AddressUtil.buildAddress(AddressUtil.getIp()));
+            LocalType localType = new LocalType(globalId, AddressUtil.buildAddress(AddressUtil.getIp()));
             localTransactionManager.buildLocalTransaction(localType);//创建一个本地事务.并将其与本地事务关联
             redisHelper.addBranchTransaction(localType);
         }
@@ -165,11 +170,11 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        if(request.getAttribute(DcsAfterHandlerOnce)!=null){//如果已经执行过了就直接返回
+        if (request.getAttribute(DcsAfterHandlerOnce) != null) {//如果已经执行过了就直接返回
             return;
         }
-        if(request.getAttribute(DcsAfterHandlerOnce)!=null){
-            request.setAttribute(DcsAfterHandlerOnce,1);
+        if (request.getAttribute(DcsAfterHandlerOnce) != null) {
+            request.setAttribute(DcsAfterHandlerOnce, 1);
         }
         String globalId = request.getHeader(DCSHeaders.globalId);
         boolean isBegin = !StringUtils.hasLength(globalId);
@@ -177,13 +182,13 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
             LocalType localType = (LocalType) request.getAttribute("localType");
             if (localType != null) {
                 //如果抛出了异常 那么就回滚
-                if (ex != null||ThreadContext.error.get()!=null) {
+                if (ex != null || ThreadContext.error.get() != null) {
                     localTransactionManager.rollBack(localType);
                     // 请求抛出了异常
-                    uploadStatusWithNotice(localType, LocalStatus.fail);
+                    uploadStatusWithNotice(localType, BranchStatus.fail);
                 } else {
                     // 请求成功
-                    uploadStatus(localType, LocalStatus.success);
+                    uploadStatus(localType, BranchStatus.success);
                 }
             }
             TransactionSynchronizationManager.clear();
@@ -191,17 +196,19 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
         }
         ThreadContext.removeAll();
     }
-    private void uploadStatusWithNotice(LocalType localType,LocalStatus localStatus){
-        localType.status=localStatus;
+
+    private void uploadStatusWithNotice(LocalType localType, BranchStatus branchStatus) {
+        localType.status = branchStatus;
         redisHelper.updateLocalTransaction(localType);
-        LocalNotice localNotice=LocalNotice.buildFronLocalType(localType);
-        Message message=new Message(MessageTypeEnum.LocalNotice, JsonUtil.objToJson(localNotice), TimeUtil.getLocalTime());
-        NettyClient.sendMsg(message,true);
+        LocalNotice localNotice = LocalNotice.buildFronLocalType(localType);
+        Message message = new Message(MessageTypeEnum.LocalNotice, JsonUtil.objToJson(localNotice), TimeUtil.getLocalTime());
+        NettyClient.sendMsg(message, true);
     }
-    private void uploadStatus(LocalType localType, LocalStatus localStatus) {
-        localType.status = localStatus;
-        if (localType.trxId==null){
-            localType.trxId=LocalTransactionManager.getTransactionId(ThreadContext.connetion.get());
+
+    private void uploadStatus(LocalType localType, BranchStatus branchStatus) {
+        localType.status = branchStatus;
+        if (localType.trxId == null) {
+            localType.trxId = LocalTransactionManager.getTransactionId(ThreadContext.connection.get());
         }
         redisHelper.updateLocalTransaction(localType);
     }
@@ -213,14 +220,11 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
 ```java
 package com.lgzClient.service;
 
-import com.lgzClient.redis.MsgReceiveHelper;
 import com.lgzClient.redis.TransactSqlRedisHelper;
 import com.lgzClient.types.LocalType;
 import com.lgzClient.types.ThreadContext;
-import com.lgzClient.types.status.LocalStatus;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.datasource.AbstractDataSource;
 import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Component;
@@ -230,84 +234,86 @@ import java.sql.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-public  class LocalTransactionManager {
-        @Autowired
-        TransactSqlRedisHelper transactSqlRedisHelper;
-        @Autowired
-        DataSourceTransactionManager transactionManager;
+public class LocalTransactionManager {
+    @Autowired
+    TransactSqlRedisHelper transactSqlRedisHelper;
+    @Autowired
+    DataSourceTransactionManager transactionManager;
 
-        public static LocalTransactionManager instance;
-        //获得事务的id
-        public static  Long getTransactionId(Connection connection){
-            String sql = "SELECT TRX_ID FROM information_schema.INNODB_TRX WHERE TRX_MYSQL_THREAD_ID = CONNECTION_ID()";
-            try (PreparedStatement ps = connection.prepareStatement(sql);
-                 ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong("TRX_ID");
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
+    public static LocalTransactionManager instance;
+
+    //获得事务的id
+    public static Long getTransactionId(Connection connection) {
+        String sql = "SELECT TRX_ID FROM information_schema.INNODB_TRX WHERE TRX_MYSQL_THREAD_ID = CONNECTION_ID()";
+        try (PreparedStatement ps = connection.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getLong("TRX_ID");
             }
-            return null;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
+        return null;
+    }
 
-        @PostConstruct
-        public void init()
-        {
-            instance=this;
-        }
-        private static final ConcurrentHashMap<String, Connection> localTransactionMaps=new ConcurrentHashMap<>();
+    @PostConstruct
+    public void init() {
+        instance = this;
+    }
 
-        public Connection buildLocalTransaction(LocalType localType) throws  SQLException//新建一个本地事务,并将其绑定到当前的线程中
-        {
-            Connection connection=transactionManager.getDataSource().getConnection();
-            ThreadContext.connetion.set(connection);
-            connection.setAutoCommit(false);
-            ConnectionHolder connectionHolder=new ConnectionHolder(connection);
-            TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(),connectionHolder);
-            localTransactionMaps.put(localType.localId,connection);
-            return connection;
-        }
+    private static final ConcurrentHashMap<String, Connection> localTransactionMaps = new ConcurrentHashMap<>();
 
-        public Connection getLocalTransaction(String localId)
-        {
-           return localTransactionMaps.get(localId);
-        }
-        //回滚事务
-        public void rollBack(LocalType localType) throws SQLException {
-            Connection connection=getLocalTransaction(localType.localId);
-            if (connection==null) return;//如果连接为null 那么说明已经被操作了
-            try {
-                connection.rollback();
-              // localType.status=LocalStatus.rollback;
-              // transactSqlRedisHelper.updateLocalTransaction(localType);
-                transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.globalId,localType.localId);
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            } finally {
-                connection.close();
-                localTransactionMaps.remove(localType.localId);
-            }
+    public Connection buildLocalTransaction(LocalType localType) throws SQLException//新建一个本地事务,并将其绑定到当前的线程中
+    {
+        Connection connection = transactionManager.getDataSource().getConnection();
+        ThreadContext.connection.set(connection);
+        connection.setAutoCommit(false);
+        ConnectionHolder connectionHolder = new ConnectionHolder(connection);
+        TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(), connectionHolder);
+        localTransactionMaps.put(localType.localId, connection);
+        return connection;
+    }
 
-        }
-        //提交事务
-        public void commit(LocalType localType) throws SQLException {
-            Connection connection=getLocalTransaction(localType.localId);
-            if (connection==null) return;
-            try {
-                connection.commit();
-               // localType.status= LocalStatus.commit;
-               // transactSqlRedisHelper.updateLocalTransaction(localType);//修改status为成功
-                transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.globalId,localType.localId);
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            } finally {
-                connection.close();
-                localTransactionMaps.remove(localType.localId);
-            }
-        }
+    public Connection getLocalTransaction(String localId) {
+        return localTransactionMaps.get(localId);
+    }
 
+    //回滚事务
+    public void rollBack(LocalType localType) throws SQLException {
+        Connection connection = getLocalTransaction(localType.localId);
+        if (connection == null) return;//如果连接为null 那么说明已经被操作了
+        try {
+            connection.rollback();
+            // localType.status=LocalStatus.rollback;
+            // transactSqlRedisHelper.updateLocalTransaction(localType);
+            transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.globalId, localType.localId);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            connection.close();
+            localTransactionMaps.remove(localType.localId);
+        }
 
     }
+
+    //提交事务
+    public void commit(LocalType localType) throws SQLException {
+        Connection connection = getLocalTransaction(localType.localId);
+        if (connection == null) return;
+        try {
+            connection.commit();
+            // localType.status= LocalStatus.commit;
+            // transactSqlRedisHelper.updateLocalTransaction(localType);//修改status为成功
+            transactSqlRedisHelper.deleteLocalTransactionWithDeleteGlobal(localType.globalId, localType.localId);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            connection.close();
+            localTransactionMaps.remove(localType.localId);
+        }
+    }
+
+
+}
 ```
 

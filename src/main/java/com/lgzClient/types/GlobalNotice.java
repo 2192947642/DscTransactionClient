@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class GlobalNotice {
-    private String localId;
+    private String branchId;
     private String globalId;
     private Boolean  isSuccess;//是否成功
 }

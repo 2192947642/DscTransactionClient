@@ -1,7 +1,7 @@
 package com.lgzClient.wrapper;
 
 import com.lgzClient.types.ThreadContext;
-import com.lgzClient.types.sql.*;
+import com.lgzClient.types.sql.recode.*;
 import com.lgzClient.utils.SqlUtil;
 
 import java.sql.*;

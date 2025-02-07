@@ -1,4 +1,4 @@
-package com.lgzClient.types.sql;
+package com.lgzClient.types.sql.service;
 
 import com.lgzClient.types.status.GlobalStatus;
 import lombok.Data;

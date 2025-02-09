@@ -1,8 +1,6 @@
 package com.lgzClient.rpc;
 import com.lgzClient.types.Result;
 import com.lgzClient.types.sql.service.BranchTransaction;
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.*;
 public interface BranchTransactRpc {
     String prefix="http://TractSqlServiceServlet";

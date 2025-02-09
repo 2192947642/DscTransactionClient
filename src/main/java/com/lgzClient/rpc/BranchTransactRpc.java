@@ -4,9 +4,8 @@ import com.lgzClient.types.sql.service.BranchTransaction;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.*;
-@Service
-@FeignClient("TractSqlServiceServlet")
 public interface BranchTransactRpc {
+    String prefix="http://TractSqlServiceServlet";
     @GetMapping("/branchTransaction")
     Result<BranchTransaction> getBranchTransaction(@RequestParam("branchId") String branchId);
     @PostMapping("/branchTransaction")

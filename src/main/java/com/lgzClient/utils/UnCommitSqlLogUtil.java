@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 @Component
-public class UnCommitlLogUtil {
+public class UnCommitSqlLogUtil {
 
     public UnCommitSqlLog buildUndoSqlLogFromLocalBranchTransaction(BranchTransaction branchTransaction){
         UnCommitSqlLog unCommitSqlLog =new UnCommitSqlLog();

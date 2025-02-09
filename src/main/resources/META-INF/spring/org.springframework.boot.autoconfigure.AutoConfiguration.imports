@@ -1,9 +1,13 @@
 com.lgzClient.aop.DCSAop
 com.lgzClient.redis.TransactSqlRedisHelper
-com.lgzClient.redis.MsgReceiveHelper
 com.lgzClient.service.LocalTransactionManager
 com.lgzClient.configure.TransactFeignHeaderConfigure
 com.lgzClient.service.TractSqlReSendService
 com.lgzClient.Start
 com.lgzClient.interceptors.DcsRequestInterceptor
 com.lgzClient.interceptors.DcsTransactionWebConfigure
+
+com.lgzClient.rpc.BranchTransactRpcImpl
+com.lgzClient.rpc.GlobalTransactRpcImpl
+com.lgzClient.utils.UnCommitSqlLogUtil
+com.lgzClient.utils.BranchTransactionUtil

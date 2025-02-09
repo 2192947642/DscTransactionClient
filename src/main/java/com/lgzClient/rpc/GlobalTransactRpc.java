@@ -9,9 +9,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.ArrayList;
-@Service
-@FeignClient("TractSqlServiceServlet")
 public interface GlobalTransactRpc {
+    String prefix="http://TractSqlServiceServlet";
     @GetMapping("/globalTransaction")
     Result<GlobalTransaction> getGlobalTransaction(@RequestParam("globalId") String globalId);
     @PostMapping("/globalTransaction/create")

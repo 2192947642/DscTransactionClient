@@ -22,7 +22,7 @@ import java.sql.SQLException;
 @ControllerAdvice
 public class DCSResponseAdvice implements ResponseBodyAdvice<Object> {
     @Autowired
-    UnCommitlLogUtil unCommitlLogUtil;
+    UnCommitSqlLogUtil unCommitSqlLogUtil;
     @Autowired
     LocalTransactionManager localTransactionManager;
     @Override
@@ -39,7 +39,7 @@ public class DCSResponseAdvice implements ResponseBodyAdvice<Object> {
                 localTransactionManager.updateStatusWithNotice(branchTransaction, BranchStatus.fail);//通知服务端本地事务执行失败了
             }
             else {//如果没有抛出异常,那么进行提交
-                UnCommitSqlLog unCommitSqlLog = unCommitlLogUtil.buildUndoLogByThread();//建立localLog
+                UnCommitSqlLog unCommitSqlLog = unCommitSqlLogUtil.buildUndoLogByThread();//建立localLog
                 localTransactionManager.addLogToDatabase(unCommitSqlLog);//将localLog添加到数据库中
                 if(StatusUtil.instance.isBegin()){//如果是分布式事务的发起者 那么通知全局事务成功
                     localTransactionManager.updateStatusWithNotice(branchTransaction, BranchStatus.success);

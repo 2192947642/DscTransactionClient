@@ -17,8 +17,10 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 public class NettyClient {
     public static NettyClient buildClient(String ip,Integer port){
-        if(clientMaps.get(new InetSocketAddress(ip,port).toString())!=null) return null;
-        NettyClient nettyClient=new NettyClient(ip,port);
+        NettyClient nettyClient=clientMaps.get(new InetSocketAddress(ip,port).toString());
+        if(nettyClient!=null) return nettyClient;
+        nettyClient=new NettyClient(ip,port);
+        clientMaps.put(new InetSocketAddress(ip,port).toString(),nettyClient);
         nettyClient.connect();
         return nettyClient;
     }
@@ -83,7 +85,6 @@ public class NettyClient {
             ChannelFuture channelFuture =bootstrap.connect(new InetSocketAddress(ip,port)).sync();
             if(channelFuture.isSuccess()){
                 connection=channelFuture.channel();
-                System.out.println(connection.localAddress());
                 NettyClient.clientMaps.put(new InetSocketAddress(ip,port).toString(),this);//连接成功后 添加到连接池中
                 Emitter.emit(Emitter.Event.Success);
             }

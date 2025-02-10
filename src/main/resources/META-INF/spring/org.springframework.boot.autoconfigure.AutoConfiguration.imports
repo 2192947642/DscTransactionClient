@@ -1,13 +1,10 @@
 com.lgzClient.aop.DCSAop
-com.lgzClient.redis.TransactSqlRedisHelper
 com.lgzClient.service.LocalTransactionManager
 
 com.lgzClient.configure.TransactFeignHeaderConfigure
 com.lgzClient.configure.TractRestTemplateConfig
 com.lgzClient.interceptors.DcsTransactionWebConfigure
 
-
-com.lgzClient.service.TractSqlReSendService
 com.lgzClient.Start
 com.lgzClient.interceptors.DcsRequestInterceptor
 

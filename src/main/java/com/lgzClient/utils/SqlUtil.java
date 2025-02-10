@@ -1,5 +1,6 @@
 package com.lgzClient.utils;
 import com.lgzClient.types.sql.recode.*;
+import com.lgzClient.wrapper.PreparedStatementWrapper;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Column;
@@ -108,8 +109,6 @@ public class SqlUtil {
      }
      public  String getFinalSql(PreparedStatement preparedStatement,String sql) throws SQLException {
         // 获取原始 SQL 模板
-       // String sql = getRawSqlFromPreparedStatement(preparedStatement);
-
         // 获取参数值列表
         List<Object> parameterValues = getParameterValues(preparedStatement);
 
@@ -119,16 +118,11 @@ public class SqlUtil {
 
      private  List<Object> getParameterValues(PreparedStatement preparedStatement) throws SQLException {
         List<Object> parameterValues = new ArrayList<>();
-        try {
-            // 使用反射获取 PreparedStatement 中的参数值列表
-            Field parameterValuesField = preparedStatement.getClass().getDeclaredField("parameterValues");
-            parameterValuesField.setAccessible(true);
-            Object[] values = (Object[]) parameterValuesField.get(preparedStatement);
-            for (Object value : values) {
-                parameterValues.add(value);
+        if(preparedStatement instanceof PreparedStatementWrapper preparedStatementWrapper){
+            HashMap hashMap=preparedStatementWrapper.getParameters();
+            for (int i = 1; i <= hashMap.size(); i++) {
+                parameterValues.add(hashMap.get(i));
             }
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            e.printStackTrace();
         }
         return parameterValues;
     }

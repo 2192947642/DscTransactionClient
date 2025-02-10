@@ -14,6 +14,7 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 import java.sql.SQLException;
@@ -29,7 +30,10 @@ public class DCSResponseAdvice implements ResponseBodyAdvice<Object> {
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
         return ThreadContext.isDscTransaction.get()==true;
     }
-
+   @ExceptionHandler(Exception.class)
+    public void exceptionHandler(Exception e){
+        log.error("dcs事务异常",e);
+    }
     @Override
     public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType, Class<? extends HttpMessageConverter<?>> selectedConverterType, ServerHttpRequest request, ServerHttpResponse response) {
         BranchTransaction branchTransaction=ThreadContext.branchTransaction.get();

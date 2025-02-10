@@ -59,12 +59,12 @@ public  class LocalTransactionManager {
                 BranchTransaction branchTransaction=branchTransactionUtil.buildDefaultTransaction();
                 if(StringUtils.hasLength(globalId)){
                     branchTransaction.setGlobalId(globalId);//设置所属的globalId
-                    branchTransaction.setBranchId(branchTransactRpc.joinBranchTransaction(branchTransaction).getData().getBranchId());//加入到当前
                 }
                 else if(!StringUtils.hasLength(branchTransaction.getGlobalId())){//如果不存在globalId那么就开启一个新的分布式事务
                    GlobalTransaction globalTransaction=globalTransactRpc.createGlobalTransaction().getData();
                     branchTransaction.setGlobalId(globalTransaction.getGlobalId());//设置globalId
                 }
+                branchTransaction.setBranchId(branchTransactRpc.joinBranchTransaction(branchTransaction).getData().getBranchId());//加入到当前的事务中
                 ThreadContext.globalId.set(branchTransaction.getGlobalId());//将该全局事务的id添加到当前的线程中
                 ThreadContext.isDscTransaction.set(true);
                 ThreadContext.branchTransaction.set(branchTransaction);

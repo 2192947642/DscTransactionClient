@@ -11,13 +11,18 @@ import java.net.URL;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 
 public class PreparedStatementWrapper implements PreparedStatement {
     private PreparedStatement preparedStatement;
     private Statement selectStatement;
     private String originalSql;
     private ArrayList<String> batchSqls;
+    private HashMap<Integer,Object> parameters;
     private SqlUtil sqlUtil;
+    public HashMap<Integer,Object> getParameters(){
+        return parameters;
+    }
     public PreparedStatementWrapper(PreparedStatement preparedStatement,String sql) throws SQLException {
         this.preparedStatement = preparedStatement;
         this.sqlUtil=new SqlUtil();
@@ -25,6 +30,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
         this.originalSql=sql;
         selectStatement=preparedStatement.getConnection().createStatement();
         this.batchSqls=new ArrayList<>();
+        this.parameters=new HashMap<>();
     }
 
     @Override
@@ -69,101 +75,121 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public void setNull(int parameterIndex, int sqlType) throws SQLException {
+        parameters.put(parameterIndex,null);
         preparedStatement.setNull(parameterIndex, sqlType);
     }
 
     @Override
     public void setBoolean(int parameterIndex, boolean x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setBoolean(parameterIndex, x);
     }
 
     @Override
     public void setByte(int parameterIndex, byte x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setByte(parameterIndex, x);
     }
 
     @Override
     public void setShort(int parameterIndex, short x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setShort(parameterIndex, x);
     }
 
     @Override
     public void setInt(int parameterIndex, int x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setInt(parameterIndex, x);
     }
 
     @Override
     public void setLong(int parameterIndex, long x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setLong(parameterIndex, x);
     }
 
     @Override
     public void setFloat(int parameterIndex, float x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setFloat(parameterIndex, x);
     }
 
     @Override
     public void setDouble(int parameterIndex, double x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setDouble(parameterIndex, x);
     }
 
     @Override
     public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setBigDecimal(parameterIndex, x);
     }
 
     @Override
     public void setString(int parameterIndex, String x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setString(parameterIndex, x);
     }
 
     @Override
     public void setBytes(int parameterIndex, byte[] x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setBytes(parameterIndex, x);
     }
 
     @Override
     public void setDate(int parameterIndex, Date x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setDate(parameterIndex, x);
     }
 
     @Override
     public void setTime(int parameterIndex, Time x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setTime(parameterIndex, x);
     }
 
     @Override
     public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setTimestamp(parameterIndex, x);
     }
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setAsciiStream(parameterIndex, x, length);
     }
 
     @Override
     public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setUnicodeStream(parameterIndex, x, length);
     }
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setBinaryStream(parameterIndex, x, length);
     }
 
     @Override
     public void clearParameters() throws SQLException {
+        parameters.clear();
         preparedStatement.clearParameters();
     }
 
     @Override
     public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setObject(parameterIndex, x, targetSqlType);
     }
 
     @Override
     public void setObject(int parameterIndex, Object x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setObject(parameterIndex, x);
     }
 
@@ -220,51 +246,61 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public void setRef(int parameterIndex, Ref x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setRef(parameterIndex, x);
     }
 
     @Override
     public void setBlob(int parameterIndex, Blob x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setBlob(parameterIndex, x);
     }
 
     @Override
     public void setClob(int parameterIndex, Clob x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setClob(parameterIndex, x);
     }
 
     @Override
     public void setArray(int parameterIndex, Array x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setArray(parameterIndex, x);
     }
 
     @Override
     public ResultSetMetaData getMetaData() throws SQLException {
+
         return preparedStatement.getMetaData();
     }
 
     @Override
     public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setDate(parameterIndex, x, cal);
     }
 
     @Override
     public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setTime(parameterIndex, x, cal);
     }
 
     @Override
     public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setTimestamp(parameterIndex, x, cal);
     }
 
     @Override
     public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
+        parameters.put(parameterIndex,null);
         preparedStatement.setNull(parameterIndex, sqlType, typeName);
     }
 
     @Override
     public void setURL(int parameterIndex, URL x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setURL(parameterIndex, x);
     }
 
@@ -275,26 +311,31 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public void setRowId(int parameterIndex, RowId x) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setRowId(parameterIndex, x);
     }
 
     @Override
     public void setNString(int parameterIndex, String value) throws SQLException {
+        parameters.put(parameterIndex,value);
         preparedStatement.setNString(parameterIndex, value);
     }
 
     @Override
     public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException {
+
         preparedStatement.setNCharacterStream(parameterIndex, value, length);
     }
 
     @Override
     public void setNClob(int parameterIndex, NClob value) throws SQLException {
+        parameters.put(parameterIndex,value);
         preparedStatement.setNClob(parameterIndex, value);
     }
 
     @Override
     public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
+
         preparedStatement.setClob(parameterIndex, reader, length);
     }
 
@@ -310,11 +351,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
+        parameters.put(parameterIndex,xmlObject);
         preparedStatement.setSQLXML(parameterIndex, xmlObject);
     }
 
     @Override
     public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
+        parameters.put(parameterIndex,x);
         preparedStatement.setObject(parameterIndex, x, targetSqlType, scaleOrLength);
     }
 

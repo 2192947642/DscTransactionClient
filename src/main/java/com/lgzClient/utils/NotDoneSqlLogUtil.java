@@ -1,8 +1,7 @@
 package com.lgzClient.utils;
 
-import com.lgzClient.types.sql.client.UnCommitSqlLog;
-
 import com.lgzClient.types.ThreadContext;
+import com.lgzClient.types.sql.client.NotDoneSqlLog;
 import com.lgzClient.types.sql.recode.*;
 import com.lgzClient.types.sql.service.BranchTransaction;
 import org.springframework.stereotype.Component;
@@ -12,28 +11,28 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 @Component
-public class UnCommitSqlLogUtil {
+public class NotDoneSqlLogUtil {
 
-    public UnCommitSqlLog buildUndoSqlLogFromLocalBranchTransaction(BranchTransaction branchTransaction){
-        UnCommitSqlLog unCommitSqlLog =new UnCommitSqlLog();
-        unCommitSqlLog.setBranchId(branchTransaction.getBranchId());
-        unCommitSqlLog.setGlobalId(branchTransaction.getGlobalId());
-        unCommitSqlLog.setBeginTime(branchTransaction.getBeginTime());
-        unCommitSqlLog.setApplicationName(branchTransaction.getApplicationName());
-        unCommitSqlLog.setServerAddress(branchTransaction.getServerAddress());
-        return unCommitSqlLog;
+    public NotDoneSqlLog buildUndoSqlLogFromLocalBranchTransaction(BranchTransaction branchTransaction){
+        NotDoneSqlLog notDoneSqlLog =new NotDoneSqlLog();
+        notDoneSqlLog.setBranchId(branchTransaction.getBranchId());
+        notDoneSqlLog.setGlobalId(branchTransaction.getGlobalId());
+        notDoneSqlLog.setBeginTime(branchTransaction.getBeginTime());
+        notDoneSqlLog.setApplicationName(branchTransaction.getApplicationName());
+        notDoneSqlLog.setServerAddress(branchTransaction.getServerAddress());
+        return notDoneSqlLog;
     };
-    public UnCommitSqlLog buildUndoLogByThread(){
-        UnCommitSqlLog unCommitSqlLog = buildUndoSqlLogFromLocalBranchTransaction(ThreadContext.branchTransaction.get());
+    public NotDoneSqlLog buildUndoLogByThread(){
+        NotDoneSqlLog notDoneSqlLog = buildUndoSqlLogFromLocalBranchTransaction(ThreadContext.branchTransaction.get());
         String requestUri= RequestUtil.instance.getRequest().getRequestURI();//请求的接口路径
-        unCommitSqlLog.setRequestUri(requestUri);
-        unCommitSqlLog.setLogs(JsonUtil.objToJson(ThreadContext.sqlRecodes.get()));//记录的sql日志
-        return unCommitSqlLog;
+        notDoneSqlLog.setRequestUri(requestUri);
+        notDoneSqlLog.setLogs(JsonUtil.objToJson(ThreadContext.sqlRecodes.get()));//记录的sql日志
+        return notDoneSqlLog;
     }
 
-    public ArrayList<Object> getRecodesByUndoLog(UnCommitSqlLog unCommitSqlLog) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public ArrayList<Object> getRecodesByUndoLog(NotDoneSqlLog notDoneSqlLog) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         ArrayList<Object> recodes=new ArrayList<>();
-        ArrayList<String> logs=JsonUtil.jsonToObject(unCommitSqlLog.getBranchId(),ArrayList.class);
+        ArrayList<String> logs=JsonUtil.jsonToObject(notDoneSqlLog.getBranchId(),ArrayList.class);
         for(String log:logs){
             HashMap<String,String> hashMap=JsonUtil.jsonToObject(log,HashMap.class);
             if(hashMap.get("sqlType").equals(SqlType.insert.name())){

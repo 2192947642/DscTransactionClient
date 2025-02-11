@@ -33,7 +33,7 @@ public class StatementWrapper implements Statement {
         String selectSql=sqlUtil.buildSelectSql(sql);
         if (sqlType == SqlType.insert) {
             InsertRecode insertRecode = new InsertRecode(sql);
-            int number = statement.executeUpdate(sql, Statement.RETURN_GENERATED_KEYS);
+            int number = statement.executeUpdate(sql);
             ResultSet generatedKeys = statement.getGeneratedKeys();
             if (generatedKeys.next()) {
                 insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
@@ -451,11 +451,13 @@ public class StatementWrapper implements Statement {
 
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
+        if(iface.isInstance(this)) return (T) this.statement;
         return statement.unwrap(iface);
     }
 
     @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException {
+        if(iface.isInstance(this)) return true;
         return statement.isWrapperFor(iface);
     }
 }

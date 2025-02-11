@@ -4,8 +4,7 @@ import com.lgzClient.types.ThreadContext;
 import com.lgzClient.types.sql.recode.*;
 import com.lgzClient.utils.SqlUtil;
 
-import java.io.InputStream;
-import java.io.Reader;
+import java.io.*;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
@@ -35,7 +34,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public ResultSet executeQuery() throws SQLException {
-        String finalSql=sqlUtil.getFinalSql(preparedStatement,originalSql);
+        String finalSql=sqlUtil.getFinalSql(this,originalSql);
         SelectRecode selectRecode=new SelectRecode(finalSql);
         ThreadContext.sqlRecodes.get().add(selectRecode);//将执行的这条select进行插入
         return preparedStatement.executeQuery();
@@ -44,7 +43,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
     @Override
     public int executeUpdate() throws SQLException {
         SqlType sqlType = sqlUtil.getSqlType(originalSql);
-        String finalSql=sqlUtil.getFinalSql(preparedStatement,originalSql);
+        String finalSql=sqlUtil.getFinalSql(this,originalSql);
         String selectSql=sqlUtil.buildSelectSql(finalSql);
         if (sqlType == SqlType.insert) {
             InsertRecode insertRecode = new InsertRecode(finalSql);
@@ -159,21 +158,62 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException {
-        parameters.put(parameterIndex,x);
-        preparedStatement.setAsciiStream(parameterIndex, x, length);
+        try {
+            PushbackInputStream pushbackInputStream = new PushbackInputStream(x);
+            byte[] bytes=pushbackInputStream.readNBytes(length);
+            parameters.put(parameterIndex,bytes);
+            pushbackInputStream.unread(bytes);
+            preparedStatement.setAsciiStream(parameterIndex, pushbackInputStream, length);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
-        parameters.put(parameterIndex,x);
-        preparedStatement.setUnicodeStream(parameterIndex, x, length);
+        try {
+            // 使用 PushbackInputStream 包装原始的 InputStream
+            PushbackInputStream pushbackInputStream = new PushbackInputStream(x);
+
+            // 读取前 length 个字节
+            byte[] bytes = pushbackInputStream.readNBytes(length);
+
+            // 将字节数组存储在 parameters 中
+            parameters.put(parameterIndex, bytes);
+
+            // 将读取的字节推回到流中
+            pushbackInputStream.unread(bytes);
+
+            // 使用原始的 InputStream 调用 setUnicodeStream
+            preparedStatement.setUnicodeStream(parameterIndex, pushbackInputStream, length);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException {
-        parameters.put(parameterIndex,x);
-        preparedStatement.setBinaryStream(parameterIndex, x, length);
+        try {
+            // 使用 PushbackInputStream 包装原始的 InputStream
+            PushbackInputStream pushbackInputStream = new PushbackInputStream(x);
+
+            // 读取前 length 个字节
+            byte[] bytes = pushbackInputStream.readNBytes(length);
+
+            // 将字节数组存储在 parameters 中
+            parameters.put(parameterIndex, bytes);
+
+            // 将读取的字节推回到流中
+            pushbackInputStream.unread(bytes);
+
+            // 使用原始的 InputStream 调用 setBinaryStream
+            preparedStatement.setBinaryStream(parameterIndex, pushbackInputStream, length);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void clearParameters() throws SQLException {
@@ -196,7 +236,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
     @Override
     public boolean execute() throws SQLException {
         SqlType sqlType=sqlUtil.getSqlType(originalSql);
-        String finalSql=sqlUtil.getFinalSql(preparedStatement,originalSql);
+        String finalSql=sqlUtil.getFinalSql(this,originalSql);
         String selectSql=sqlUtil.buildSelectSql(finalSql);
         if(sqlType == SqlType.select){
             SelectRecode selectRecode=new SelectRecode(finalSql);
@@ -234,15 +274,42 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public void addBatch() throws SQLException {
-        String finalSql=sqlUtil.getFinalSql(preparedStatement,originalSql);
+        String finalSql=sqlUtil.getFinalSql(this,originalSql);
         preparedStatement.addBatch();
         batchSqls.add(finalSql);
     }
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
-        preparedStatement.setCharacterStream(parameterIndex, reader, length);
+        try {
+            // 使用 PushbackReader 包装原始的 Reader
+            PushbackReader pushbackReader = new PushbackReader(reader);
+
+            // 创建一个字符数组来存储读取的字符
+            char[] chars = new char[length];
+
+            // 读取前 length 个字符
+            int readCount = pushbackReader.read(chars, 0, length);
+
+            // 将读取的字符数组存储在 parameters 中
+            if (readCount > 0) {
+                parameters.put(parameterIndex, new String(chars, 0, readCount));
+            } else {
+                parameters.put(parameterIndex, "");
+            }
+
+            // 将读取的字符推回到流中
+            if (readCount > 0) {
+                pushbackReader.unread(chars, 0, readCount);
+            }
+
+            // 使用原始的 Reader 调用 setCharacterStream
+            preparedStatement.setCharacterStream(parameterIndex, pushbackReader, length);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setRef(int parameterIndex, Ref x) throws SQLException {
@@ -323,9 +390,35 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException {
+        try {
+            // 使用 PushbackReader 包装原始的 Reader
+            PushbackReader pushbackReader = new PushbackReader(value);
 
-        preparedStatement.setNCharacterStream(parameterIndex, value, length);
+            // 创建一个字符数组来存储读取的字符
+            char[] chars = new char[(int) length];
+
+            // 读取前 length 个字符
+            int readCount = pushbackReader.read(chars, 0, (int) length);
+
+            // 将读取的字符数组存储在 parameters 中
+            if (readCount > 0) {
+                parameters.put(parameterIndex, new String(chars, 0, readCount));
+            } else {
+                parameters.put(parameterIndex, "");
+            }
+
+            // 将读取的字符推回到流中
+            if (readCount > 0) {
+                pushbackReader.unread(chars, 0, readCount);
+            }
+
+            // 使用原始的 Reader 调用 setNCharacterStream
+            preparedStatement.setNCharacterStream(parameterIndex, pushbackReader, length);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setNClob(int parameterIndex, NClob value) throws SQLException {
@@ -341,6 +434,8 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
+        PushbackInputStream pushbackInputStream=new PushbackInputStream(inputStream);
+
         preparedStatement.setBlob(parameterIndex, inputStream, length);
     }
 
@@ -363,38 +458,211 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
-        preparedStatement.setAsciiStream(parameterIndex, x, length);
+        try {
+            // 使用 PushbackInputStream 包装原始的 InputStream
+            PushbackInputStream pushbackInputStream = new PushbackInputStream(x);
+
+            // 创建一个字节数组来存储读取的字节
+            byte[] bytes = new byte[(int) length];
+
+            // 读取前 length 个字节
+            int readCount = pushbackInputStream.read(bytes, 0, (int) length);
+
+            // 将读取的字节数组存储在 parameters 中
+            if (readCount > 0) {
+                parameters.put(parameterIndex, new String(bytes, 0, readCount, "ASCII"));
+            } else {
+                parameters.put(parameterIndex, "");
+            }
+
+            // 将读取的字节推回到流中
+            if (readCount > 0) {
+                pushbackInputStream.unread(bytes, 0, readCount);
+            }
+
+            // 使用原始的 InputStream 调用 setAsciiStream
+            preparedStatement.setAsciiStream(parameterIndex, pushbackInputStream, length);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
-        preparedStatement.setBinaryStream(parameterIndex, x, length);
+        try {
+            // 使用 PushbackInputStream 包装原始的 InputStream
+            PushbackInputStream pushbackInputStream = new PushbackInputStream(x);
+
+            // 创建一个字节数组来存储读取的字节
+            byte[] bytes = new byte[(int) length];
+
+            // 读取前 length 个字节
+            int readCount = pushbackInputStream.read(bytes, 0, (int) length);
+
+            // 将读取的字节数组存储在 parameters 中
+            if (readCount > 0) {
+                parameters.put(parameterIndex, bytes);
+            } else {
+                parameters.put(parameterIndex, new byte[0]);
+            }
+
+            // 将读取的字节推回到流中
+            if (readCount > 0) {
+                pushbackInputStream.unread(bytes, 0, readCount);
+            }
+
+            // 使用原始的 InputStream 调用 setBinaryStream
+            preparedStatement.setBinaryStream(parameterIndex, pushbackInputStream, length);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
-        preparedStatement.setCharacterStream(parameterIndex, reader, length);
+        try {
+            // 使用 PushbackReader 包装原始的 Reader
+            PushbackReader pushbackReader = new PushbackReader(reader);
+
+            // 创建一个字符数组来存储读取的字符
+            char[] chars = new char[(int) length];
+
+            // 读取前 length 个字符
+            int readCount = pushbackReader.read(chars, 0, (int) length);
+
+            // 将读取的字符数组存储在 parameters 中
+            if (readCount > 0) {
+                parameters.put(parameterIndex, new String(chars, 0, readCount));
+            } else {
+                parameters.put(parameterIndex, "");
+            }
+
+            // 将读取的字符推回到流中
+            if (readCount > 0) {
+                pushbackReader.unread(chars, 0, readCount);
+            }
+
+            // 使用原始的 Reader 调用 setCharacterStream
+            preparedStatement.setCharacterStream(parameterIndex, pushbackReader, length);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException {
-        preparedStatement.setAsciiStream(parameterIndex, x);
+        try {
+            // 使用 ByteArrayOutputStream 读取 InputStream 的全部内容
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = x.read(buffer)) != -1) {
+                byteArrayOutputStream.write(buffer, 0, bytesRead);
+            }
+
+            // 获取读取到的字节数组
+            byte[] bytes = byteArrayOutputStream.toByteArray();
+
+            // 将字节数组存储在 parameters 中
+            parameters.put(parameterIndex, bytes);
+
+            // 使用 ByteArrayInputStream 包装字节数组
+            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+
+            // 使用 ByteArrayInputStream 调用 setAsciiStream
+            preparedStatement.setAsciiStream(parameterIndex, byteArrayInputStream);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
-        preparedStatement.setBinaryStream(parameterIndex, x);
+        try {
+            // 使用 ByteArrayOutputStream 读取 InputStream 的全部内容
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = x.read(buffer)) != -1) {
+                byteArrayOutputStream.write(buffer, 0, bytesRead);
+            }
+
+            // 获取读取到的字节数组
+            byte[] bytes = byteArrayOutputStream.toByteArray();
+
+            // 将字节数组存储在 parameters 中
+            parameters.put(parameterIndex, bytes);
+
+            // 使用 ByteArrayInputStream 包装字节数组
+            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+
+            // 使用 ByteArrayInputStream 调用 setBinaryStream
+            preparedStatement.setBinaryStream(parameterIndex, byteArrayInputStream);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException {
-        preparedStatement.setCharacterStream(parameterIndex, reader);
+        try {
+            // 使用 StringWriter 读取 Reader 的全部内容
+            StringWriter stringWriter = new StringWriter();
+            char[] buffer = new char[1024];
+            int charsRead;
+            while ((charsRead = reader.read(buffer)) != -1) {
+                stringWriter.write(buffer, 0, charsRead);
+            }
+
+            // 获取读取到的字符串
+            String content = stringWriter.toString();
+
+            // 将字符串存储在 parameters 中
+            parameters.put(parameterIndex, content);
+
+            // 使用 StringReader 包装字符串
+            StringReader stringReader = new StringReader(content);
+
+            // 使用 StringReader 调用 setCharacterStream
+            preparedStatement.setCharacterStream(parameterIndex, stringReader);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
-        preparedStatement.setNCharacterStream(parameterIndex, value);
+        try {
+            // 使用 StringWriter 读取 Reader 的全部内容
+            StringWriter stringWriter = new StringWriter();
+            char[] buffer = new char[1024];
+            int charsRead;
+            while ((charsRead = value.read(buffer)) != -1) {
+                stringWriter.write(buffer, 0, charsRead);
+            }
+
+            // 获取读取到的字符串
+            String content = stringWriter.toString();
+
+            // 将字符串存储在 parameters 中
+            parameters.put(parameterIndex, content);
+
+            // 使用 StringReader 包装字符串
+            StringReader stringReader = new StringReader(content);
+
+            // 使用 StringReader 调用 setNCharacterStream
+            preparedStatement.setNCharacterStream(parameterIndex, stringReader);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 
     @Override
     public void setClob(int parameterIndex, Reader reader) throws SQLException {
@@ -828,8 +1096,6 @@ public class PreparedStatementWrapper implements PreparedStatement {
         }
         if(sqlType == SqlType.delete){//如果sql的类型是删除
             DeleteRecode deleteRecode=new DeleteRecode(sql);
-            ResultSet resultSet = selectStatement.executeQuery(selectSql);
-
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             ThreadContext.sqlRecodes.get().add(deleteRecode);
             boolean flag= preparedStatement.execute(sql,columnNames);
@@ -870,11 +1136,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
+        if(iface.isInstance(this)) return (T) this.preparedStatement;
         return preparedStatement.unwrap(iface);
     }
 
     @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException {
+        if(iface.isInstance(this)) return true;
         return preparedStatement.isWrapperFor(iface);
     }
 }

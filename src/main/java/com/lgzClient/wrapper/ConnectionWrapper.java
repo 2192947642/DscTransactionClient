@@ -1,13 +1,9 @@
 package com.lgzClient.wrapper;
 
-import com.lgzClient.types.ThreadContext;
-import com.lgzClient.utils.SqlUtil;
-
 import java.sql.*;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 // 自定义 Connection 包装类

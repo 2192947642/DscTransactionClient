@@ -3,7 +3,6 @@ package com.lgzClient.interceptors;
 import com.alibaba.nacos.common.utils.StringUtils;
 import com.lgzClient.service.LocalTransactionManager;
 import com.lgzClient.types.ThreadContext;
-
 import com.lgzClient.types.status.DCSHeaders;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -38,7 +37,7 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        if(ThreadContext.isDscTransaction.get()!=true) return;
+        if(ThreadContext.isDscTransaction.get()==null||ThreadContext.isDscTransaction.get()!=true) return;
         if(request.getAttribute(DcsAfterHandlerOnce)!=null){//如果已经执行过了就直接返回
             return;
         }

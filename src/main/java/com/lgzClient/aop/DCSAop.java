@@ -1,8 +1,8 @@
 package com.lgzClient.aop;
 
 import com.lgzClient.service.LocalTransactionManager;
-import com.lgzClient.types.*;
-import com.lgzClient.utils.*;
+import com.lgzClient.utils.RequestUtil;
+import com.lgzClient.utils.StatusUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;

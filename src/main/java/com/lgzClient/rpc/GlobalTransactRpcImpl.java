@@ -1,6 +1,5 @@
 package com.lgzClient.rpc;
 
-import com.lgzClient.rpc.GlobalTransactRpc;
 import com.lgzClient.types.Result;
 import com.lgzClient.types.sql.service.GlobalTransaction;
 import org.springframework.beans.factory.annotation.Autowired;

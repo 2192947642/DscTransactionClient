@@ -14,7 +14,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<String> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, String string) throws Exception {
-        Message msg= JsonUtil.jsonToObject(string,Message.class);
+         Message msg= JsonUtil.jsonToObject(string,Message.class);
         if(msg.getType() == MessageTypeEnum.GlobalNotice){
             handleGlobalNotice(msg);
         }

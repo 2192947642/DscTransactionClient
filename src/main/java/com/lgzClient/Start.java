@@ -2,15 +2,10 @@ package com.lgzClient;
 
 import com.alibaba.cloud.nacos.discovery.NacosServiceDiscovery;
 import com.alibaba.nacos.api.exception.NacosException;
-import com.lgzClient.NettyClient;
-import com.lgzClient.service.LocalTransactionManager;
 import com.lgzClient.utils.AddressUtil;
-import com.lgzClient.utils.BranchTransactionUtil;
-import com.lgzClient.utils.UnCommitSqlLogUtil;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

@@ -1,10 +1,11 @@
 package com.lgzClient.utils;
-import com.lgzClient.types.sql.recode.*;
+
+import com.lgzClient.types.sql.recode.SqlType;
 import com.lgzClient.wrapper.PreparedStatementWrapper;
 import net.sf.jsqlparser.JSQLParserException;
+import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Column;
-import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.insert.Insert;
@@ -13,8 +14,9 @@ import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SelectItem;
 import net.sf.jsqlparser.statement.update.Update;
 
-import java.lang.reflect.Field;
-import java.sql.*;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -107,7 +109,7 @@ public class SqlUtil {
              throw new RuntimeException(e);
          }
      }
-     public  String getFinalSql(PreparedStatement preparedStatement,String sql) throws SQLException {
+     public  String getFinalSql(PreparedStatementWrapper preparedStatement,String sql) throws SQLException {
         // 获取原始 SQL 模板
         // 获取参数值列表
         List<Object> parameterValues = getParameterValues(preparedStatement);
@@ -116,13 +118,13 @@ public class SqlUtil {
         return replacePlaceholders(sql, parameterValues);
     }
 
-     private  List<Object> getParameterValues(PreparedStatement preparedStatement) throws SQLException {
+     private  List<Object> getParameterValues(PreparedStatementWrapper preparedStatement)  {
         List<Object> parameterValues = new ArrayList<>();
-        if(preparedStatement instanceof PreparedStatementWrapper preparedStatementWrapper){
-            HashMap hashMap=preparedStatementWrapper.getParameters();
+
+            HashMap hashMap=preparedStatement.getParameters();
             for (int i = 1; i <= hashMap.size(); i++) {
                 parameterValues.add(hashMap.get(i));
-            }
+
         }
         return parameterValues;
     }

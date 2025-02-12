@@ -30,7 +30,7 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
         }
         String globalId= request.getHeader(DCSHeaders.globalId);//获得全局事务id
         if(StringUtils.hasLength(globalId)){//如果当前是分布式事务调用,那么就加入到分布式事务中
-           localTransactionManager.begin(globalId);
+           localTransactionManager.begin(globalId,null);
         }
         return true; // 返回true表示继续处理请求，返回false则中断请求处理
     }

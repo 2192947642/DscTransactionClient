@@ -10,11 +10,13 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import lombok.Getter;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+@Getter
 public class NettyClient {
     public static NettyClient buildClient(String ip,Integer port){
         NettyClient nettyClient=clientMaps.get(new InetSocketAddress(ip,port).toString());
@@ -38,14 +40,14 @@ public class NettyClient {
         Object[]keys= clientMaps.keySet().toArray();
         int originAlVal=(number)%keys.length;//初始index
         int index=originAlVal;
-        number++;
+        number=(number+1)%keys.length;
         while(true){
             NettyClient nettyClient= clientMaps.get(keys[index]);
             if(nettyClient.connection!=null&&nettyClient.connection.isActive()){
                 return nettyClient;
             }
             index=(index+1)%keys.length;
-            if(number==originAlVal){
+            if(index==originAlVal){
                 throw new RuntimeException("当前所有的事务管理服务端都未成功连接");
             }
        }
@@ -84,7 +86,7 @@ public class NettyClient {
             }
             ChannelFuture channelFuture =bootstrap.connect(new InetSocketAddress(ip,port)).sync();
             if(channelFuture.isSuccess()){
-                connection=channelFuture.channel();
+                connection=channelFuture.channel();//获得新建连接的 管道
                 NettyClient.clientMaps.put(new InetSocketAddress(ip,port).toString(),this);//连接成功后 添加到连接池中
                 Emitter.emit(Emitter.Event.Success);
             }
@@ -100,19 +102,19 @@ public class NettyClient {
     }
     private void reconnect(){
         executor.execute(()->{
-            int count=0;
-            while(count++< ClientConfig.maxReconnectAttempts){
-                try{
-                    Thread.sleep(ClientConfig.reconnectInterval);
-                    Channel channel=connect();
-                    if(channel!=null&&channel.isActive()){
-                        break;
+                int count=0;
+                while(count++< ClientConfig.getInstance().maxReconnectAttempts&&!Thread.currentThread().isInterrupted()){
+                    try{
+                        Thread.sleep(ClientConfig.getInstance().reconnectInterval);
+                        Channel channel=connect();
+                        if(channel!=null&&channel.isActive()){
+                            break;
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
                     }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(e);
                 }
-            }
         });
     }
 }

@@ -31,8 +31,8 @@ public class GlobalTransactRpcImpl implements GlobalTransactRpc {
     }
 
     @Override
-    public Result<GlobalTransaction> createGlobalTransaction() {
-        String url = prefix+"/globalTransaction/create";
+    public Result<GlobalTransaction> createGlobalTransaction(Long timeout) {
+        String url = prefix+"/globalTransaction/create?timeout="+timeout;
         ResponseEntity<Result<GlobalTransaction>> response = restTemplate.exchange(
                 url,
                 HttpMethod.POST,

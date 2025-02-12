@@ -12,7 +12,7 @@ public interface GlobalTransactRpc {
     @GetMapping("/globalTransaction")
     Result<GlobalTransaction> getGlobalTransaction(@RequestParam("globalId") String globalId);
     @PostMapping("/globalTransaction/create")
-    Result<GlobalTransaction> createGlobalTransaction();
+    Result<GlobalTransaction> createGlobalTransaction(@RequestParam("timeout") long timeout);
     @GetMapping("/globalTransactions")
     Result<ArrayList<GlobalTransaction>> getGlobalTransactions(@RequestParam("globalIds")ArrayList<String> globalIds);
 }

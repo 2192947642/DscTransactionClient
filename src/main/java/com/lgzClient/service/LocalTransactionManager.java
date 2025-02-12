@@ -1,8 +1,10 @@
 package com.lgzClient.service;
 
+import com.lgzClient.annotations.DCSTransaction;
 import com.lgzClient.rpc.BranchTransactRpc;
 import com.lgzClient.rpc.GlobalTransactRpc;
 import com.lgzClient.types.ThreadContext;
+import com.lgzClient.types.TransactContainer;
 import com.lgzClient.types.sql.client.NotDoneSqlLog;
 import com.lgzClient.types.sql.service.BranchTransaction;
 import com.lgzClient.types.sql.service.GlobalTransaction;
@@ -13,7 +15,6 @@ import com.lgzClient.utils.TimeUtil;
 import com.lgzClient.wrapper.ConnectionWrapper;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Component;
@@ -21,8 +22,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.StringUtils;
 
 import java.net.UnknownHostException;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -35,38 +40,48 @@ public  class LocalTransactionManager {
         BranchTransactRpc branchTransactRpc;
         @Autowired
         BranchTransactionUtil branchTransactionUtil;
-        @Value("${spring.application.name}")
-        public String applicationName;
+
         @Autowired
         DataSourceTransactionManager transactionManager;
         public static LocalTransactionManager instance;
-        //获得事务的id
-        public static  Long getTransactionId(Connection connection){
-            String sql = "SELECT TRX_ID FROM information_schema.INNODB_TRX WHERE TRX_MYSQL_THREAD_ID = CONNECTION_ID()";
-            try (PreparedStatement ps = connection.prepareStatement(sql);
-                 ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong("TRX_ID");
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-            return null;
+        public void updateLocalSuccessTime(String branchId){//修改本地事务的successTime
+            localTransactionMaps.get(branchId).setSuccessTime(new Date());
         }
-
         @PostConstruct
         public void init()
         {
             instance=this;
         }
-        private static final ConcurrentHashMap<String, ConnectionWrapper> localTransactionMaps=new ConcurrentHashMap<>();
-        public void begin(String globalId) throws SQLException, UnknownHostException {
+        private static final ConcurrentHashMap<String, TransactContainer> localTransactionMaps=new ConcurrentHashMap<>();
+
+        //获得 n毫秒之前完成但是没有进行提交或者回滚的本地事务
+        public ArrayList<TransactContainer> getUnDoTransactions(long millisecond){
+            ArrayList<TransactContainer> transactContainers=new ArrayList<>();
+            localTransactionMaps.forEach((k,v)->{
+                if(v.getSuccessTime()!=null){
+                    transactContainers.add(v);
+                }
+            });//将所有已经成功的本地事务加入到list中
+            transactContainers.sort((o1, o2) -> o1.getSuccessTime().compareTo(o2.getSuccessTime()));
+            Long nowTime=TimeUtil.getNowTime();
+            ArrayList<TransactContainer> returnList=new ArrayList<>();
+            for (TransactContainer transactContainer :  transactContainers){
+                Date successTime=transactContainer.getSuccessTime();
+                if(nowTime-successTime.getTime()>=millisecond){
+                    returnList.add(transactContainer);
+                }else{
+                    break;
+                }
+            }
+            return returnList;
+        }
+        public void begin(String globalId, DCSTransaction dcsTransaction) throws SQLException, UnknownHostException {
                 BranchTransaction branchTransaction=branchTransactionUtil.buildDefaultTransaction();
                 if(StringUtils.hasLength(globalId)){
                     branchTransaction.setGlobalId(globalId);//设置所属的globalId
                 }
                 else if(!StringUtils.hasLength(branchTransaction.getGlobalId())){//如果不存在globalId那么就开启一个新的分布式事务
-                    GlobalTransaction globalTransaction=globalTransactRpc.createGlobalTransaction().getData();
+                    GlobalTransaction globalTransaction=globalTransactRpc.createGlobalTransaction(dcsTransaction.timeout()).getData();
                     branchTransaction.setGlobalId(globalTransaction.getGlobalId());//设置globalId
                 }
                 branchTransaction.setBranchId(branchTransactRpc.joinBranchTransaction(branchTransaction).getData().getBranchId());//加入到当前的事务中
@@ -78,7 +93,7 @@ public  class LocalTransactionManager {
                 this.addLogToDatabase(notDoneSqlLog);
                 this.buildLocalTransaction(branchTransaction);//创建一个本地事务.并将其与本地事务关联
         }
-        //修改存储在redis中的本地事务状态
+        //修改存储在服务端中的本地事务状态
         public void updateStatus(BranchTransaction branchTransaction, BranchStatus branchStatus) {
              branchTransaction.setStatus(branchStatus);
              branchTransaction.setStatus(branchStatus);
@@ -103,57 +118,59 @@ public  class LocalTransactionManager {
             connection.setAutoCommit(false);
             ConnectionHolder connectionHolder=new ConnectionHolder(connection);
             TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(),connectionHolder);
-            localTransactionMaps.put(branchTransaction.getBranchId(),connection);
+            localTransactionMaps.put(branchTransaction.getBranchId(),new TransactContainer(connection));
             return connection;
         }
 
-        public ConnectionWrapper getLocalTransaction(String localId)
+        public ConnectionWrapper getLocalTransaction(String branchId)
         {
-           return localTransactionMaps.get(localId);
+            TransactContainer transactContainer=localTransactionMaps.get(branchId);
+            if(transactContainer==null) return null;
+            return  transactContainer.getConnection();
         }
-        public void removeLocalTransaction(String localId){
-            localTransactionMaps.remove(localId);
+        public void removeLocalTransaction(String branchId){
+            localTransactionMaps.remove(branchId);
         }
         //回滚事务
-        public void rollBack(String localId) throws SQLException {
-            ConnectionWrapper connection=getLocalTransaction(localId);
+        public void rollBack(String branchId) throws SQLException {
+            ConnectionWrapper connection=getLocalTransaction(branchId);
             if (connection==null) return;
             if (connection.isClosed()){
-                localTransactionMaps.remove(localId);
+                localTransactionMaps.remove(branchId);
                 return;
             };
             try {
                 connection.rollback();
                 connection.setAutoCommit(true);
-                LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,localId);//从数据库中删除该未完成的事务
-                BranchTransaction branchTransaction= BranchTransaction.builder().branchId(localId).status(BranchStatus.rollback).build();
+                LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
+                BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.rollback).build();
                 branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             } finally {
                 connection.close();
-                localTransactionMaps.remove(localId);
+                localTransactionMaps.remove(branchId);
             }
 
         }
         //提交事务
-        public void commit(String localId) throws SQLException {
-            ConnectionWrapper connection=getLocalTransaction(localId);
+        public void commit(String branchId) throws SQLException {
+            ConnectionWrapper connection=getLocalTransaction(branchId);
             if (connection==null) return;
             if (connection.isClosed()){
-                localTransactionMaps.remove(localId);
+                localTransactionMaps.remove(branchId);
                 return;
             };
             try {
-                LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,localId);//从数据库中删除该未完成的事务
+                LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
                 connection.commit();//提交事务 与上一个为同一事务 确保原子性
-                BranchTransaction branchTransaction= BranchTransaction.builder().branchId(localId).status(BranchStatus.commit).build();
+                BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.commit).build();
                 branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             } finally {
                 connection.close();
-                localTransactionMaps.remove(localId);
+                localTransactionMaps.remove(branchId);
             }
         }
         public void updateLogOfDBS(NotDoneSqlLog notDoneSqlLog){
@@ -224,13 +241,13 @@ public  class LocalTransactionManager {
                 }
             }
     }
-        public void deleteUnDoLogFromDatabase(ConnectionWrapper connection,String localId) throws SQLException {
+        public void deleteUnDoLogFromDatabase(ConnectionWrapper connection,String branchId) throws SQLException {
              String sql = "delete from not_done_sql_log where  branch_id = ?";
              PreparedStatement preparedStatement = null;
              try {
                  preparedStatement = connection.prepareStatementWithoutWrapper(sql);
                  // 设置参数
-                 preparedStatement.setString(1, localId);
+                 preparedStatement.setString(1, branchId);
                  preparedStatement.executeUpdate();
              }
              catch (SQLException e) {

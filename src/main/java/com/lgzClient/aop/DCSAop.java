@@ -1,5 +1,6 @@
 package com.lgzClient.aop;
 
+import com.lgzClient.annotations.DCSTransaction;
 import com.lgzClient.service.LocalTransactionManager;
 import com.lgzClient.utils.RequestUtil;
 import com.lgzClient.utils.StatusUtil;
@@ -9,8 +10,11 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import java.lang.reflect.Method;
 
 @Component
 @Aspect
@@ -26,8 +30,12 @@ public class DCSAop {
      public Object dscAround(ProceedingJoinPoint joinPoint) throws Throwable {
           HttpServletRequest httpServletRequest=RequestUtil.instance.getRequest();
           Boolean isBegin= StatusUtil.instance.isBegin(httpServletRequest);//是否是分布式事务的发起者 只有发起者才会向server发送 本地事务完成的通知 其他分支事务都是直接修改redis中的本地事务状态
+
           if(isBegin){
-               localTransactionManager.begin(null);// 开启一个事务
+               MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+               Method method = signature.getMethod();
+               DCSTransaction dscTransaction=method.getAnnotation(DCSTransaction.class);
+               localTransactionManager.begin(null,dscTransaction);// 开启一个事务
           }
           Object[] args=joinPoint.getArgs();
           Object res=joinPoint.proceed(args);

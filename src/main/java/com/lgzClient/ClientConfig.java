@@ -16,6 +16,8 @@ public class ClientConfig {
     {
         instance=this;
     }
+    @Value("${spring.cloud.dcstransaction.checkTransactionTimeOutInterval:3000}")
+    public  int checkTimeOutInterval;//检查
     @Value("${spring.cloud.dcstransaction.maxReconnectAttempts:5}")
     public  int maxReconnectAttempts;//设置最大重连次数
     @Value("${spring.cloud.dcstransaction.reconnectInterval:2000}")

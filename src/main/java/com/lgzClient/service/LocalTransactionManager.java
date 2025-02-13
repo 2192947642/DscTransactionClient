@@ -33,16 +33,16 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public  class LocalTransactionManager {
         @Autowired
-        NotDoneSqlLogUtil notDoneSqlLogUtil;
+        private NotDoneSqlLogUtil notDoneSqlLogUtil;
         @Autowired
-        GlobalTransactRpc globalTransactRpc;
+        private GlobalTransactRpc globalTransactRpc;
         @Autowired
-        BranchTransactRpc branchTransactRpc;
+        private BranchTransactRpc branchTransactRpc;
         @Autowired
-        BranchTransactionUtil branchTransactionUtil;
+        private BranchTransactionUtil branchTransactionUtil;
 
         @Autowired
-        DataSourceTransactionManager transactionManager;
+        private DataSourceTransactionManager transactionManager;
         public static LocalTransactionManager instance;
         public void updateLocalSuccessTime(String branchId){//修改本地事务的successTime
             localTransactionMaps.get(branchId).setSuccessTime(new Date());
@@ -118,10 +118,9 @@ public  class LocalTransactionManager {
             connection.setAutoCommit(false);
             ConnectionHolder connectionHolder=new ConnectionHolder(connection);
             TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(),connectionHolder);
-            localTransactionMaps.put(branchTransaction.getBranchId(),new TransactContainer(connection));
+            localTransactionMaps.put(branchTransaction.getBranchId(),new TransactContainer(connection,branchTransaction));
             return connection;
         }
-
         public ConnectionWrapper getLocalTransaction(String branchId)
         {
             TransactContainer transactContainer=localTransactionMaps.get(branchId);

@@ -23,7 +23,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<String> {
     public void handleGlobalNotice(Message message) throws SQLException {
         GlobalNotice globalNotice= JsonUtil.jsonToObject(message.getContent(),GlobalNotice.class);
         if(globalNotice.getIsSuccess())//如果全局事务成功 那么就提交事务
-            LocalTransactionManager.instance.commit(globalNotice.getBranchId());
-        else LocalTransactionManager.instance.rollBack(globalNotice.getBranchId());//回滚事务
+            LocalTransactionManager.instance.commitByThreadPoolAndWebFlux(globalNotice.getBranchId());//提交事务
+        else LocalTransactionManager.instance.rollBackByThreadPoolAndWebFlux(globalNotice.getBranchId());//回滚事务
     }
 }

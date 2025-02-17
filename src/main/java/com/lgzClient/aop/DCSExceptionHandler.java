@@ -1,6 +1,6 @@
 package com.lgzClient.aop;
 import com.lgzClient.types.Result;
-import com.lgzClient.types.ThreadContext;
+import com.lgzClient.types.DCSThreadContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -14,7 +14,7 @@ public class DCSExceptionHandler {
     @ExceptionHandler(value= Exception.class)
     public Result exceptionHandler(Exception ex){
         Result result=Result.error(ex.getMessage());
-        ThreadContext.error.set(ex);
+        DCSThreadContext.error.set(ex);
         return result;
     }
 }

@@ -1,6 +1,6 @@
 package com.lgzClient.wrapper;
 
-import com.lgzClient.types.ThreadContext;
+import com.lgzClient.types.DCSThreadContext;
 import com.lgzClient.types.sql.recode.*;
 import com.lgzClient.utils.SqlUtil;
 
@@ -36,7 +36,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
     public ResultSet executeQuery() throws SQLException {
         String finalSql=sqlUtil.getFinalSql(this,originalSql);
         SelectRecode selectRecode=new SelectRecode(finalSql);
-        ThreadContext.sqlRecodes.get().add(selectRecode);//将执行的这条select进行插入
+        DCSThreadContext.sqlRecodes.get().add(selectRecode);//将执行的这条select进行插入
         return preparedStatement.executeQuery();
     }
 
@@ -52,7 +52,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
             if (generatedKeys.next()) {
                 insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return number;
         } else if (sqlType == SqlType.update) {
             UpdateRecode updateRecode = new UpdateRecode(finalSql);
@@ -60,13 +60,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
 
             int number = preparedStatement.executeUpdate();
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return number;
         } else if (sqlType == SqlType.delete) {
             DeleteRecode deleteRecode = new DeleteRecode(finalSql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             int number = preparedStatement.executeUpdate();
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             return number;
         }
         return preparedStatement.executeUpdate();
@@ -240,7 +240,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
         String selectSql=sqlUtil.buildSelectSql(finalSql);
         if(sqlType == SqlType.select){
             SelectRecode selectRecode=new SelectRecode(finalSql);
-            ThreadContext.sqlRecodes.get().add(selectRecode);
+            DCSThreadContext.sqlRecodes.get().add(selectRecode);
             return preparedStatement.execute();
         }
         if(sqlType == SqlType.update){
@@ -248,7 +248,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
             updateRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             boolean flag= preparedStatement.execute();
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return flag;
         }
         if(sqlType == SqlType.insert){
@@ -258,13 +258,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
             if (generatedKeys.next()) {
                 insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return flag;
         }
         if(sqlType == SqlType.delete){
             DeleteRecode deleteRecode=new DeleteRecode(finalSql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             boolean flag= preparedStatement.execute();
             return flag;
         }
@@ -682,7 +682,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
     @Override
     public ResultSet executeQuery(String sql) throws SQLException {
         SelectRecode selectRecode = new SelectRecode(sql);
-        ThreadContext.sqlRecodes.get().add(selectRecode);
+        DCSThreadContext.sqlRecodes.get().add(selectRecode);
         return preparedStatement.executeQuery(sql);
     }
 
@@ -695,7 +695,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
             updateRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             int number= preparedStatement.executeUpdate(sql);
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return number;
         }
         if(sqlType == SqlType.insert){
@@ -705,13 +705,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
             if (generatedKeys.next()) {
                 insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return number;
         }
         if(sqlType == SqlType.delete){
             DeleteRecode deleteRecode=new DeleteRecode(sql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             int number= preparedStatement.executeUpdate(sql);
             return number;
         }
@@ -784,7 +784,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
         String selectSql=sqlUtil.buildSelectSql(sql);
         if(sqlType == SqlType.select){
             SelectRecode selectRecode = new SelectRecode(sql);
-            ThreadContext.sqlRecodes.get().add(selectRecode);
+            DCSThreadContext.sqlRecodes.get().add(selectRecode);
             return preparedStatement.execute(sql);
         }
         if(sqlType == SqlType.insert){
@@ -794,7 +794,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
             if (generatedKeys.next()) {
                 insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return flag;
         }
         if(sqlType==SqlType.update){
@@ -802,14 +802,14 @@ public class PreparedStatementWrapper implements PreparedStatement {
             updateRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             boolean flag= preparedStatement.execute(sql);
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return flag;
         }
         if(sqlType==SqlType.delete){
             DeleteRecode deleteRecode = new DeleteRecode(sql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             boolean flag= preparedStatement.execute(sql);
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             return flag;
         }
         return preparedStatement.execute(sql);
@@ -906,7 +906,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
                     insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
                 }
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return number;
         }
         if(sqlType == SqlType.update){
@@ -914,13 +914,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
             updateRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             int number= preparedStatement.executeUpdate(sql, autoGeneratedKeys);
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return number;
         }
         if(sqlType == SqlType.delete){//如果sql的类型是删除
             DeleteRecode deleteRecode=new DeleteRecode(sql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             int number= preparedStatement.executeUpdate(sql,autoGeneratedKeys);
             return number;
         }
@@ -938,7 +938,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
             if (generatedKeys.next()) {
                 insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return number;
         }
         if(sqlType == SqlType.update){
@@ -946,13 +946,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
             updateRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             int number= preparedStatement.executeUpdate(sql, columnIndexes);
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return number;
         }
         if(sqlType == SqlType.delete){//如果sql的类型是删除
             DeleteRecode deleteRecode=new DeleteRecode(sql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             int number= preparedStatement.executeUpdate(sql,columnIndexes);
             return number;
         }
@@ -970,7 +970,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
             if (generatedKeys.next()) {
                 insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return number;
         }
         if(sqlType == SqlType.update){
@@ -978,13 +978,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
             updateRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             int number= preparedStatement.executeUpdate(sql, columnNames);
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return number;
         }
         if(sqlType == SqlType.delete){//如果sql的类型是删除
             DeleteRecode deleteRecode=new DeleteRecode(sql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             int number= preparedStatement.executeUpdate(sql,columnNames);
             return number;
         }
@@ -997,7 +997,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
         String selectSql=sqlUtil.buildSelectSql(sql);
         if(sqlType == SqlType.select){
             SelectRecode selectRecode=new SelectRecode(sql);
-            ThreadContext.sqlRecodes.get().add(selectRecode);
+            DCSThreadContext.sqlRecodes.get().add(selectRecode);
             return selectStatement.execute(sql, autoGeneratedKeys);
         }
         if(sqlType == SqlType.insert){//如果是插入的话那么就返回插入的id
@@ -1009,7 +1009,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
                     insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
                 }
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return flag;
         }
         if(sqlType == SqlType.update){
@@ -1017,13 +1017,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
             updateRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             boolean flag= preparedStatement.execute(sql, autoGeneratedKeys);
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return flag;
         }
         if(sqlType == SqlType.delete){//如果sql的类型是删除
             DeleteRecode deleteRecode=new DeleteRecode(sql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             boolean flag= preparedStatement.execute(sql,autoGeneratedKeys);
             return flag;
         }
@@ -1036,7 +1036,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
         String selectSql=sqlUtil.buildSelectSql(sql);
         if(sqlType == SqlType.select){
             SelectRecode selectRecode=new SelectRecode(sql);
-            ThreadContext.sqlRecodes.get().add(selectRecode);
+            DCSThreadContext.sqlRecodes.get().add(selectRecode);
             return selectStatement.execute(sql, columnIndexes);
         }
         if(sqlType == SqlType.insert){//如果是插入的话那么就返回插入的id
@@ -1046,7 +1046,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
             if (generatedKeys.next()) {
                 insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return flag;
         }
         if(sqlType == SqlType.update){
@@ -1054,13 +1054,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
             updateRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             boolean flag= preparedStatement.execute(sql, columnIndexes);
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return flag;
         }
         if(sqlType == SqlType.delete){//如果sql的类型是删除
             DeleteRecode deleteRecode=new DeleteRecode(sql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             boolean flag= preparedStatement.execute(sql,columnIndexes);
             return flag;
         }
@@ -1073,7 +1073,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
         String selectSql=sqlUtil.buildSelectSql(sql);
         if(sqlType == SqlType.select){
             SelectRecode selectRecode=new SelectRecode(sql);
-            ThreadContext.sqlRecodes.get().add(selectRecode);
+            DCSThreadContext.sqlRecodes.get().add(selectRecode);
             return selectStatement.execute(sql, columnNames);
         }
         if(sqlType == SqlType.insert){//如果是插入的话那么就返回插入的id
@@ -1083,7 +1083,7 @@ public class PreparedStatementWrapper implements PreparedStatement {
             if (generatedKeys.next()) {
                 insertRecode.getGeneratedKeys().add(generatedKeys.getInt(1));
             }
-            ThreadContext.sqlRecodes.get().add(insertRecode);
+            DCSThreadContext.sqlRecodes.get().add(insertRecode);
             return flag;
         }
         if(sqlType == SqlType.update){
@@ -1091,13 +1091,13 @@ public class PreparedStatementWrapper implements PreparedStatement {
             updateRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
             boolean flag= preparedStatement.execute(sql, columnNames);
             updateRecode.setAfter(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(updateRecode);
+            DCSThreadContext.sqlRecodes.get().add(updateRecode);
             return flag;
         }
         if(sqlType == SqlType.delete){//如果sql的类型是删除
             DeleteRecode deleteRecode=new DeleteRecode(sql);
             deleteRecode.setBefore(sqlUtil.getResultSetJson(selectStatement.executeQuery(selectSql)));
-            ThreadContext.sqlRecodes.get().add(deleteRecode);
+            DCSThreadContext.sqlRecodes.get().add(deleteRecode);
             boolean flag= preparedStatement.execute(sql,columnNames);
             return flag;
         }

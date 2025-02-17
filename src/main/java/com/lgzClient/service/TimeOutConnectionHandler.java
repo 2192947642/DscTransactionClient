@@ -34,7 +34,7 @@ public class TimeOutConnectionHandler {
     @Autowired
     LocalTransactionManager localTransactionManager;
     //超时检查
-    public void checkTimeOut() throws Exception {
+    public void checkTimeOut() {
         ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactions(3000);
         if(transactContainers.size()==0) return;
         ArrayList<String> globalIds=new ArrayList<>();
@@ -51,10 +51,10 @@ public class TimeOutConnectionHandler {
             String globalId=transactContainer.getBranchTransaction().getGlobalId();
             String branchId=transactContainer.getBranchTransaction().getBranchId();
             if(globalTransactionHashMap.get(globalId).getStatus() == GlobalStatus.fail){
-                localTransactionManager.rollBack(branchId);
+                localTransactionManager.rollBackByThreadPoolAndWebFlux(branchId);
             }
             else if(globalTransactionHashMap.get(globalId).getStatus()== GlobalStatus.success){
-                localTransactionManager.commit(branchId);
+                localTransactionManager.commitByThreadPoolAndWebFlux(branchId);
             }
         }
     }

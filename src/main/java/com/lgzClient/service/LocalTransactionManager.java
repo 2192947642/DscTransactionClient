@@ -1,19 +1,22 @@
 package com.lgzClient.service;
 
 import com.lgzClient.annotations.DCSTransaction;
+import com.lgzClient.exceptions.DcsTransactionError;
 import com.lgzClient.rpc.BranchTransactRpc;
 import com.lgzClient.rpc.GlobalTransactRpc;
-import com.lgzClient.types.ThreadContext;
+import com.lgzClient.rpc.webflux.BranchTransactRpcWebFlux;
+import com.lgzClient.types.BothTransaction;
+import com.lgzClient.types.DCSThreadContext;
 import com.lgzClient.types.TransactContainer;
 import com.lgzClient.types.sql.client.NotDoneSqlLog;
 import com.lgzClient.types.sql.service.BranchTransaction;
-import com.lgzClient.types.sql.service.GlobalTransaction;
 import com.lgzClient.types.status.BranchStatus;
 import com.lgzClient.utils.BranchTransactionUtil;
 import com.lgzClient.utils.NotDoneSqlLogUtil;
 import com.lgzClient.utils.TimeUtil;
 import com.lgzClient.wrapper.ConnectionWrapper;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -29,11 +32,20 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+@Slf4j
 @Component
 public  class LocalTransactionManager {
+        public static void setDbExecutor(ExecutorService executor){
+            dbExecutor=executor;
+        }
+        private static ExecutorService dbExecutor = Executors.newFixedThreadPool(10);
         @Autowired
         private NotDoneSqlLogUtil notDoneSqlLogUtil;
+        @Autowired
+        BranchTransactRpcWebFlux branchTransactRpcWebFlux;
         @Autowired
         private GlobalTransactRpc globalTransactRpc;
         @Autowired
@@ -77,19 +89,20 @@ public  class LocalTransactionManager {
         }
         public void begin(String globalId, DCSTransaction dcsTransaction) throws SQLException, UnknownHostException {
                 BranchTransaction branchTransaction=branchTransactionUtil.buildDefaultTransaction();
-                if(StringUtils.hasLength(globalId)){
+                if(StringUtils.hasLength(globalId)){//如果存在globalId那么就加入到当前的事务中
                     branchTransaction.setGlobalId(globalId);//设置所属的globalId
+                    branchTransaction.setBranchId(branchTransactRpc.joinBranchTransaction(branchTransaction).getData().getBranchId());//加入到当前的事务中
                 }
-                else if(!StringUtils.hasLength(branchTransaction.getGlobalId())){//如果不存在globalId那么就开启一个新的分布式事务
-                    GlobalTransaction globalTransaction=globalTransactRpc.createGlobalTransaction(dcsTransaction.timeout()).getData();
-                    branchTransaction.setGlobalId(globalTransaction.getGlobalId());//设置globalId
+                else{//如果不存在globalId那么就开启并加入一个新的分布式事务
+                    BothTransaction bothTransaction=globalTransactRpc.createAndJoinGlobalTransaction(dcsTransaction.timeout(),branchTransaction).getData();
+                    branchTransaction.setGlobalId(bothTransaction.getGlobalTransaction().getGlobalId());//设置globalId
+                    branchTransaction.setBranchId(bothTransaction.getBranchTransaction().getBranchId());//设置branchId
                 }
-                branchTransaction.setBranchId(branchTransactRpc.joinBranchTransaction(branchTransaction).getData().getBranchId());//加入到当前的事务中
-                ThreadContext.sqlRecodes.set(new ArrayList<>());
-                ThreadContext.globalId.set(branchTransaction.getGlobalId());//将该全局事务的id添加到当前的线程中
-                ThreadContext.isDscTransaction.set(true);
-                ThreadContext.branchTransaction.set(branchTransaction);
-                NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildUndoLogByThread();//建立localLog
+                DCSThreadContext.sqlRecodes.set(new ArrayList<>());
+                DCSThreadContext.globalId.set(branchTransaction.getGlobalId());//将该全局事务的id添加到当前的线程中
+                DCSThreadContext.isDscTransaction.set(true);
+                DCSThreadContext.branchTransaction.set(branchTransaction);
+                NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
                 this.addLogToDatabase(notDoneSqlLog);
                 this.buildLocalTransaction(branchTransaction);//创建一个本地事务.并将其与本地事务关联
         }
@@ -99,22 +112,22 @@ public  class LocalTransactionManager {
              branchTransaction.setStatus(branchStatus);
              branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//修改分支事务的状
          }
-        public void updateStatusWithNotice(BranchTransaction branchTransaction, BranchStatus branchStatus) throws InterruptedException {
+        public void updateStatusWithNotice(BranchTransaction branchTransaction, BranchStatus branchStatus){
             branchTransaction.setStatus(branchStatus);
             branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);
         }
         public void updateStatus(BranchStatus branchStatus){
-            BranchTransaction branchTransaction=ThreadContext.branchTransaction.get();
+            BranchTransaction branchTransaction= DCSThreadContext.branchTransaction.get();
             updateStatus(branchTransaction, branchStatus);
         }
         public void updateStatusWithNotice(BranchStatus branchStatus) throws InterruptedException {
-             BranchTransaction branchTransaction=ThreadContext.branchTransaction.get();
+             BranchTransaction branchTransaction= DCSThreadContext.branchTransaction.get();
              updateStatusWithNotice(branchTransaction, branchStatus);
         }
         private Connection buildLocalTransaction(BranchTransaction branchTransaction) throws  SQLException//新建一个本地事务,并将其绑定到当前的线程中
         {
             ConnectionWrapper connection=new ConnectionWrapper(transactionManager.getDataSource().getConnection());
-            ThreadContext.connection.set(connection);
+            DCSThreadContext.connection.set(connection);
             connection.setAutoCommit(false);
             ConnectionHolder connectionHolder=new ConnectionHolder(connection);
             TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(),connectionHolder);
@@ -131,46 +144,70 @@ public  class LocalTransactionManager {
             localTransactionMaps.remove(branchId);
         }
         //回滚事务
-        public void rollBack(String branchId) throws SQLException {
+        public void rollBack(String branchId,Boolean useFlux) {
             ConnectionWrapper connection=getLocalTransaction(branchId);
             if (connection==null) return;
-            if (connection.isClosed()){
-                localTransactionMaps.remove(branchId);
-                return;
-            };
-            try {
-                connection.rollback();
-                connection.setAutoCommit(true);
-                LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
-                BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.rollback).build();
-                branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            } finally {
-                connection.close();
-                localTransactionMaps.remove(branchId);
+            synchronized (connection){
+                try {
+                    if (connection.isClosed()){
+                        localTransactionMaps.remove(branchId);
+                        return;
+                    };
+                    connection.rollback();
+                    connection.setAutoCommit(true);
+                    LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
+                    BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.rollback).build();
+                    if(!useFlux)  branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
+                    else branchTransactRpcWebFlux.updateBranchTransactionStatusWithNotice(branchTransaction);
+                }catch (SQLException sqlException){
+                    throw new DcsTransactionError(sqlException.getMessage());
+                }
+                finally {
+                    try {
+                        if(!connection.isClosed())  connection.close();
+                    } catch (SQLException sqlException) {
+                        throw new DcsTransactionError(sqlException.getMessage());
+                    }
+                }
             }
-
+        }
+        public void rollBackByThreadPoolAndWebFlux(String branchId){
+            dbExecutor.submit(()->{
+                rollBack(branchId,true);
+            });
+        }
+        public void commitByThreadPoolAndWebFlux(String branchId){
+            dbExecutor.submit(()->{
+                    commit(branchId,true);
+            });
         }
         //提交事务
-        public void commit(String branchId) throws SQLException {
+        public void commit(String branchId,Boolean useFlux)   {
             ConnectionWrapper connection=getLocalTransaction(branchId);
             if (connection==null) return;
-            if (connection.isClosed()){
-                localTransactionMaps.remove(branchId);
-                return;
-            };
-            try {
-                LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
-                connection.commit();//提交事务 与上一个为同一事务 确保原子性
-                BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.commit).build();
-                branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            } finally {
-                connection.close();
-                localTransactionMaps.remove(branchId);
+            synchronized (connection){
+                try{
+                if (connection.isClosed()){
+                    localTransactionMaps.remove(branchId);
+                    return;
+                };
+                    LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
+                    connection.commit();//提交事务 与上一个为同一事务 确保原子性
+                    BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.commit).build();
+                    if(!useFlux) branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态
+                    else branchTransactRpcWebFlux.updateBranchTransactionStatusWithNotice(branchTransaction);
+                } catch (SQLException e) {
+                   throw new DcsTransactionError(e.getMessage());
+                } finally {
+                    try {
+                        if(!connection.isClosed()) connection.close();
+                    } catch (SQLException e) {
+                        throw new DcsTransactionError(e.getMessage());
+                    }
+                    localTransactionMaps.remove(branchId);
+                }
             }
+
         }
         public void updateLogOfDBS(NotDoneSqlLog notDoneSqlLog){
             String sql = "update not_done_sql_log set logs= ? where branch_id= ?";

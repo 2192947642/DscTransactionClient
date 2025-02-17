@@ -2,7 +2,6 @@ package com.lgzClient;
 
 import com.lgzClient.exceptions.DcsTransactionError;
 import com.lgzClient.types.Message;
-import com.lgzClient.utils.Emitter;
 import com.lgzClient.utils.JsonUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -88,7 +87,6 @@ public class NettyClient {
             if(channelFuture.isSuccess()){
                 connection=channelFuture.channel();//获得新建连接的 管道
                 NettyClient.clientMaps.put(new InetSocketAddress(ip,port).toString(),this);//连接成功后 添加到连接池中
-                Emitter.emit(Emitter.Event.Success);
             }
             connection.closeFuture().addListener((ChannelFuture future)->{//关闭后
                  clientMaps.remove(new InetSocketAddress(ip,port).toString());
@@ -102,8 +100,7 @@ public class NettyClient {
     }
     private void reconnect(){
         executor.execute(()->{
-                int count=0;
-                while(count++< ClientConfig.getInstance().maxReconnectAttempts&&!Thread.currentThread().isInterrupted()){
+                while(!Thread.currentThread().isInterrupted()){
                     try{
                         Thread.sleep(ClientConfig.getInstance().reconnectInterval);
                         Channel channel=connect();

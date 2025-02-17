@@ -10,7 +10,6 @@ import java.util.logging.Logger;
 public class ConnectionWrapper implements Connection {
     private static final Logger LOGGER = Logger.getLogger(ConnectionWrapper.class.getName());
     private final Connection targetConnection;
-
     public ConnectionWrapper(Connection targetConnection) {
         this.targetConnection = targetConnection;
     }

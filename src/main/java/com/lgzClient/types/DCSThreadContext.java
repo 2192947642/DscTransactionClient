@@ -4,7 +4,7 @@ import com.lgzClient.types.sql.service.BranchTransaction;
 import java.sql.Connection;
 import java.util.ArrayList;
 
-public class ThreadContext {
+public class DCSThreadContext {
     public static final ThreadLocal<String> globalId=new ThreadLocal<String>();
     public static final ThreadLocal<Throwable> error=new ThreadLocal<Throwable>();
     public static final ThreadLocal<Connection> connection =new ThreadLocal<Connection>();

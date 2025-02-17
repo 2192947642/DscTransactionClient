@@ -1,10 +1,13 @@
 package com.lgzClient.rpc;
 
+import com.lgzClient.types.BothTransaction;
 import com.lgzClient.types.Result;
+import com.lgzClient.types.sql.service.BranchTransaction;
 import com.lgzClient.types.sql.service.GlobalTransaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -50,6 +53,21 @@ public class GlobalTransactRpcImpl implements GlobalTransactRpc {
                 HttpMethod.GET,
                 null,
                 new ParameterizedTypeReference<Result<ArrayList<GlobalTransaction>>>() {}
+        );
+        return response.getBody();
+    }
+
+
+
+    @Override
+    public Result<BothTransaction> createAndJoinGlobalTransaction(Long timeout, BranchTransaction branchTransaction) {
+        String url = prefix+"/globalTransaction/createAndJoin?timeout="+timeout;
+        HttpEntity<BranchTransaction> request = new HttpEntity<>(branchTransaction);
+        ResponseEntity<Result<BothTransaction>> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                request,
+                new ParameterizedTypeReference<Result<BothTransaction>>() {}
         );
         return response.getBody();
     }

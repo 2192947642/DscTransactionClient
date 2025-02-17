@@ -1,6 +1,6 @@
 package com.lgzClient.utils;
 
-import com.lgzClient.types.ThreadContext;
+import com.lgzClient.types.DCSThreadContext;
 import com.lgzClient.types.sql.client.NotDoneSqlLog;
 import com.lgzClient.types.sql.recode.*;
 import com.lgzClient.types.sql.service.BranchTransaction;
@@ -22,11 +22,11 @@ public class NotDoneSqlLogUtil {
         notDoneSqlLog.setServerAddress(branchTransaction.getServerAddress());
         return notDoneSqlLog;
     };
-    public NotDoneSqlLog buildUndoLogByThread(){
-        NotDoneSqlLog notDoneSqlLog = buildUndoSqlLogFromLocalBranchTransaction(ThreadContext.branchTransaction.get());
+    public NotDoneSqlLog buildNotDoneLogByThread(){
+        NotDoneSqlLog notDoneSqlLog = buildUndoSqlLogFromLocalBranchTransaction(DCSThreadContext.branchTransaction.get());
         String requestUri= RequestUtil.instance.getRequest().getRequestURI();//请求的接口路径
         notDoneSqlLog.setRequestUri(requestUri);
-        notDoneSqlLog.setLogs(JsonUtil.objToJson(ThreadContext.sqlRecodes.get()));//记录的sql日志
+        notDoneSqlLog.setLogs(JsonUtil.objToJson(DCSThreadContext.sqlRecodes.get()));//记录的sql日志
         return notDoneSqlLog;
     }
 

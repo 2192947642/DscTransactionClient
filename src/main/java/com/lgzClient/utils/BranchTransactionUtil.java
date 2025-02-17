@@ -14,7 +14,7 @@ public class BranchTransactionUtil {
     public BranchTransaction buildDefaultTransaction() throws UnknownHostException {
         BranchTransaction branchTransaction=new BranchTransaction();
         branchTransaction.setApplicationName(applicationName);//当前的服务名称
-        branchTransaction.setServerAddress(AddressUtil.buildAddress(AddressUtil.getIp()));
+        branchTransaction.setServerAddress(AddressUtil.buildAddress(AddressUtil.getIp()));//当前服务的地址
         branchTransaction.setBeginTime(TimeUtil.getLocalTime());//当前的时间
         branchTransaction.setStatus(BranchStatus.wait);
         return branchTransaction;

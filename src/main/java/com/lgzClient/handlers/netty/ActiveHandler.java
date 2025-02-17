@@ -1,4 +1,4 @@
-package com.lgzClient.handlers;
+package com.lgzClient.handlers.netty;
 
 import com.lgzClient.types.Message;
 import com.lgzClient.types.ServerAddress;

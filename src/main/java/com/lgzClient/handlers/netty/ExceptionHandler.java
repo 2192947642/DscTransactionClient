@@ -1,4 +1,4 @@
-package com.lgzClient.handlers;
+package com.lgzClient.handlers.netty;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;

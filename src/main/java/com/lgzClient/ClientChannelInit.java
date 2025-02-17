@@ -1,8 +1,8 @@
 package com.lgzClient;
 
-import com.lgzClient.handlers.ActiveHandler;
-import com.lgzClient.handlers.ExceptionHandler;
-import com.lgzClient.handlers.MessageHandler;
+import com.lgzClient.handlers.netty.ActiveHandler;
+import com.lgzClient.handlers.netty.ExceptionHandler;
+import com.lgzClient.handlers.netty.MessageHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;

@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 @Order(Ordered.LOWEST_PRECEDENCE)
 public class DCSExceptionHandler {
-    @ExceptionHandler(value= Exception.class)
+    @ExceptionHandler(value= Throwable.class)
     public Result exceptionHandler(Exception ex){
         Result result=Result.error(ex.getMessage());
         DCSThreadContext.error.set(ex);

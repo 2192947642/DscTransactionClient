@@ -35,7 +35,7 @@ public class TimeOutConnectionHandler {
     LocalTransactionManager localTransactionManager;
     //超时检查
     public void checkTimeOut() {
-        ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactions(3000);
+        ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactions(clientConfig.checkTimeOutInterval);
         if(transactContainers.size()==0) return;
         ArrayList<String> globalIds=new ArrayList<>();
         for (TransactContainer transactContainer : transactContainers) {

@@ -144,7 +144,7 @@ public  class LocalTransactionManager {
             localTransactionMaps.remove(branchId);
         }
         //回滚事务
-        public void rollBack(String branchId,Boolean useFlux) {
+        public void rollBack(String branchId,Boolean useFlux,Boolean notice) {
             ConnectionWrapper connection=getLocalTransaction(branchId);
             if (connection==null) return;
             synchronized (connection){
@@ -157,8 +157,14 @@ public  class LocalTransactionManager {
                     connection.setAutoCommit(true);
                     LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
                     BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.rollback).build();
-                    if(!useFlux)  branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
-                    else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction);
+                    if(!notice){
+                        if(!useFlux)  branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
+                        else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction);
+                    }
+                    else if(notice){
+                        if(!useFlux)  branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);//更新服务端的分支事务状态 为回滚
+                        else branchTransactRpcWebFlux.updateBranchTransactionStatusWithNotice(branchTransaction);
+                    }
                 }catch (SQLException sqlException){
                     throw new DcsTransactionError(sqlException.getMessage());
                 }
@@ -173,7 +179,7 @@ public  class LocalTransactionManager {
         }
         public void rollBackByThreadPoolAndWebFlux(String branchId){
             dbExecutor.submit(()->{
-                rollBack(branchId,true);
+                rollBack(branchId,true,false);
             });
         }
         public void commitByThreadPoolAndWebFlux(String branchId){

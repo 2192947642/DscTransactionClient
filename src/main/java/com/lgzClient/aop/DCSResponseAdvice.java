@@ -29,9 +29,8 @@ public class DCSResponseAdvice implements  ResponseBodyAdvice<Object> {
     @Override
     public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType, Class<? extends HttpMessageConverter<?>> selectedConverterType, ServerHttpRequest request, ServerHttpResponse response) {
         BranchTransaction branchTransaction= DCSThreadContext.branchTransaction.get();
-        if(DCSThreadContext.error.get()!=null){//如果抛出了异常 那么就进行回滚
-            localTransactionManager.rollBack(branchTransaction.getBranchId(),false);//回滚本地事务
-            localTransactionManager.updateStatusWithNotice(branchTransaction, BranchStatus.fail);//通知服务端本地事务执行失败了
+        if(DCSThreadContext.error.get()!=null){//如果抛出了异常 那么就直接进行回滚
+            localTransactionManager.rollBack(branchTransaction.getBranchId(),false,true);//回滚本地事务
         }
         else {//如果没有抛出异常
             NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
@@ -43,7 +42,6 @@ public class DCSResponseAdvice implements  ResponseBodyAdvice<Object> {
                 localTransactionManager.updateStatus(branchTransaction, BranchStatus.success);//修改redis状态为成功
             }
         }
-
         return body;
     }
 }

@@ -30,7 +30,6 @@ public class DCSAop {
      public Object dscAround(ProceedingJoinPoint joinPoint) throws Throwable {
           HttpServletRequest httpServletRequest=RequestUtil.instance.getRequest();
           Boolean isBegin= StatusUtil.instance.isBegin(httpServletRequest);//是否是分布式事务的发起者 只有发起者才会向server发送 本地事务完成的通知 其他分支事务都是直接修改redis中的本地事务状态
-
           if(isBegin){
                MethodSignature signature = (MethodSignature) joinPoint.getSignature();
                Method method = signature.getMethod();

@@ -165,11 +165,4 @@ public class SqlUtil {
         }
         return JsonUtil.objToJson(resultList);
      }
-     public static void main(String [] args){
-         SqlUtil sqlUtil=new SqlUtil();
-         String sql="update user set name='lgz' where id=?";
-         SqlType sqlType=sqlUtil.getSqlType(sql);
-         System.out.println(sqlType);
-         System.out.println(sqlUtil.buildSelectSql(sql));
-     }
 }

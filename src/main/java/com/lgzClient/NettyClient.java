@@ -13,8 +13,8 @@ import lombok.Getter;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.locks.LockSupport;
+
 @Getter
 public class NettyClient {
     public static NettyClient buildClient(String ip,Integer port){
@@ -51,7 +51,10 @@ public class NettyClient {
             }
        }
     }
-    Executor executor=Executors.newSingleThreadExecutor();
+
+    private Thread reConnectionThread=new Thread(()->{
+        reconnect();
+    });
     private EventLoopGroup group;
     private  Bootstrap bootstrap;
     private Channel connection;
@@ -88,9 +91,15 @@ public class NettyClient {
                 connection=channelFuture.channel();//获得新建连接的 管道
                 NettyClient.clientMaps.put(new InetSocketAddress(ip,port).toString(),this);//连接成功后 添加到连接池中
             }
-            connection.closeFuture().addListener((ChannelFuture future)->{//关闭后
-                 clientMaps.remove(new InetSocketAddress(ip,port).toString());
-                 reconnect();//失败后重连
+            connection.closeFuture().addListener((ChannelFuture future)->{
+                try {
+                    clientMaps.remove(new InetSocketAddress(ip,port).toString());
+                    if(!reConnectionThread.isAlive()){//如果还没有开启当前线程
+                        reConnectionThread.start();
+                    }
+                }finally {
+                    LockSupport.unpark(reConnectionThread);
+                }
             });
             return connection;
         }catch (Exception e){
@@ -99,19 +108,18 @@ public class NettyClient {
         return null;
     }
     private void reconnect(){
-        executor.execute(()->{
-                while(!Thread.currentThread().isInterrupted()){
-                    try{
-                        Thread.sleep(ClientConfig.getInstance().reconnectInterval);
-                        Channel channel=connect();
-                        if(channel!=null&&channel.isActive()){
-                            break;
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException(e);
+            while(!Thread.currentThread().isInterrupted()){
+                try{
+                    Channel channel=this.connection;
+                    if(channel!=null&&channel.isActive()){
+                        LockSupport.park();
                     }
+                    Thread.sleep(ClientConfig.getInstance().reconnectInterval);
+                    connect();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
                 }
-        });
-    }
+            }
+        }
 }

@@ -1,4 +1,5 @@
 package com.lgzClient.types;
+import com.lgzClient.rpc.BranchTransactRpc;
 import com.lgzClient.types.sql.service.BranchTransaction;
 
 import java.sql.Connection;
@@ -12,6 +13,12 @@ public class DCSThreadContext {
     public static final ThreadLocal<ArrayList<Object>> sqlRecodes=new ThreadLocal<ArrayList<Object>>();
     public static final ThreadLocal<BranchTransaction> branchTransaction =new ThreadLocal<BranchTransaction>();
     public static final ThreadLocal<Boolean> isDscTransaction=new ThreadLocal<Boolean>();
+    public static void init(BranchTransaction branchTransaction){
+        DCSThreadContext.sqlRecodes.set(new ArrayList<>());
+        DCSThreadContext.globalId.set(branchTransaction.getGlobalId());//将该全局事务的id添加到当前的线程中
+        DCSThreadContext.isDscTransaction.set(true);
+        DCSThreadContext.branchTransaction.set(branchTransaction);
+    }
     public static void removeAll(){
         branchTransaction.remove();
         isDscTransaction.remove();

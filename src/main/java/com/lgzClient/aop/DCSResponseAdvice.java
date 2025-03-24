@@ -34,7 +34,7 @@ public class DCSResponseAdvice implements  ResponseBodyAdvice<Object> {
         }
         else {//如果没有抛出异常
             NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
-            localTransactionManager.updateLogOfDBS(notDoneSqlLog);//将localLog更新到数据库中
+            notDoneSqlLogUtil.updateLogOfDBS(notDoneSqlLog);//将localLog更新到数据库中
             localTransactionManager.updateLocalSuccessTime(branchTransaction.getBranchId());
             if(StatusUtil.instance.isBegin()){//如果是分布式事务的发起者 那么通知全局事务成功
                 localTransactionManager.updateStatusWithNotice(branchTransaction, BranchStatus.success);

@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.util.ArrayList;
 
 public class DCSThreadContext {
+
     public static final ThreadLocal<String> globalId=new ThreadLocal<String>();
     public static final ThreadLocal<Throwable> error=new ThreadLocal<Throwable>();
     public static final ThreadLocal<Connection> connection =new ThreadLocal<Connection>();
@@ -13,6 +14,10 @@ public class DCSThreadContext {
     public static final ThreadLocal<ArrayList<Object>> sqlRecodes=new ThreadLocal<ArrayList<Object>>();
     public static final ThreadLocal<BranchTransaction> branchTransaction =new ThreadLocal<BranchTransaction>();
     public static final ThreadLocal<Boolean> isDscTransaction=new ThreadLocal<Boolean>();
+
+    public static void setGlobalId(String globalId){
+        DCSThreadContext.globalId.set(globalId);
+    }
     public static void init(BranchTransaction branchTransaction){
         DCSThreadContext.sqlRecodes.set(new ArrayList<>());
         DCSThreadContext.globalId.set(branchTransaction.getGlobalId());//将该全局事务的id添加到当前的线程中

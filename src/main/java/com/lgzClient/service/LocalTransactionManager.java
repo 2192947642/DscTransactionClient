@@ -147,12 +147,11 @@ public class LocalTransactionManager {
                 if (connection.isClosed()) {
                     removeLocalTransaction(branchId);
                     return;
-                }
-                ;
+                };
                 connection.rollback();
                 connection.setAutoCommit(true);
                 notDoneSqlLogUtil.deleteUnDoLogFromDatabase(connection, branchId);//从数据库中删除该未完成的事务
-                BranchTransaction branchTransaction = BranchTransaction.builder().branchId(branchId).status(BranchStatus.rollback).build();
+                BranchTransaction branchTransaction = BranchTransaction.builder().globalId(DCSThreadContext.globalId.get()).branchId(branchId).status(BranchStatus.rollback).build();
                 if (!notice) {
                     if (!useFlux) branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
                     else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();

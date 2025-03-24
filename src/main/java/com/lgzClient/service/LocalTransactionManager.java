@@ -257,7 +257,7 @@ public  class LocalTransactionManager {
                 // 设置参数
                 preparedStatement.setString(1, notDoneSqlLog.getGlobalId());
                 preparedStatement.setString(2, notDoneSqlLog.getBranchId());
-                preparedStatement.setTimestamp(3, new Timestamp(TimeUtil.strToDate(notDoneSqlLog.getBeginTime()).getTime()));
+                preparedStatement.setTimestamp(3, Timestamp.valueOf(TimeUtil.strToDate(notDoneSqlLog.getBeginTime())));
                 preparedStatement.setString(4, notDoneSqlLog.getRequestUri());
                 preparedStatement.setString(5, notDoneSqlLog.getApplicationName());
                 preparedStatement.setString(6, notDoneSqlLog.getServerAddress());

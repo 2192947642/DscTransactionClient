@@ -3,15 +3,34 @@
 ##### 功能
 
 - 负责将本地事务加入到分布式事务中
-- 对加入到分布式事务中的线程,将数据库连接交由LocalTransactionManage来进行管理。
+- 将数据库连接交由LocalTransactionManage来进行管理,
 - 对connection和statement进行包装,记录执行的sql语句和执行前后的数据库数据变化,当本地事务执行开始前将其基础状态(global_id,branch_id,begin_time)保存到not_do_sql_log中.当本地事务执行成功后,将执行的sql记录更新到not_do_sql_log中
 - 通过netty来接受来自服务端的分布式事务消息通知,根据全局事务的状态来控制对应connection的回滚或者提交同时删除客户端数据库中的表not_do_sql_log中的对应的本地事务的sql记录.
 
 ##### 使用
 
+###### 客户端数据表创建
+
+```mysql
+create table not_done_sql_log
+(
+    global_id        varchar(100)      null comment '全局事务id',
+    branch_id        varchar(100)      not null comment '分支事务id'
+        primary key,
+    begin_time       datetime          null comment '分支事务的开启时间',
+    request_uri      varchar(400)      null comment '分支任务的请求路径',
+    application_name varchar(100)      null comment '服务名',
+    server_address   varchar(30)       null comment '服务的ip地址',
+    logs             text              null comment '事务运行的日志 包含每次sql语句执行修改前后的数据'
+);
+
+create index not_done_sql_log_global_id_index
+    on not_done_sql_log (global_id);
+```
+
 ######    事务开启
 
-​	使用注解**@DcsTransaction**来表示一个分布式事务的起点,在后续调用链路中,会通过**http**请求头中的**globaId**来进行分布式事务的传递。@DcsTransaction和@Transaction两个注解不可以同时使用。但是在调用链路中被调用者可以使用@Transaction注解(事务传播类型应该是加入到当前事务当中),如果自定义了全局异常处理器 那么应该对DCSThreadContext.error来进行错误赋值 来使得错误正常捕获
+​	使用注解**@DcsTransaction**来表示一个分布式事务的起点,在后续调用链路中,会通过**http**请求头中的**globaId**来进行分布式事务的传递。@DcsTransaction和@Transaction两个注解不可以同时使用。但是在调用链路中被调用者可以使用@Transaction注解(事务传播类型应该是加入到当前事务当中),如果自定义了全局异常处理器 那么应该对ThreadContext.error来进行错误赋值 来使得错误正常捕获
 
 ###### 	事务状态查询
 
@@ -228,283 +247,268 @@ public class DCSResponseAdvice implements  ResponseBodyAdvice<Object> {
 
 ```java
 package com.lgzClient.service;
-
 @Slf4j
 @Component
-public class LocalTransactionManager {
-    public static void setDbExecutor(ExecutorService executor) {
-        dbExecutor = executor;
-    }
-
-    private static ExecutorService dbExecutor = Executors.newFixedThreadPool(10);
-    @Autowired
-    private NotDoneSqlLogUtil notDoneSqlLogUtil;
-    @Autowired
-    BranchTransactRpcWebFlux branchTransactRpcWebFlux;
-    @Autowired
-    private GlobalTransactRpc globalTransactRpc;
-    @Autowired
-    private BranchTransactRpc branchTransactRpc;
-    @Autowired
-    private BranchTransactionUtil branchTransactionUtil;
-
-    @Autowired
-    private DataSourceTransactionManager transactionManager;
-    public static LocalTransactionManager instance;
-
-    public void updateLocalSuccessTime(String branchId) {//修改本地事务的successTime
-        localTransactionMaps.get(branchId).setSuccessTime(new Date());
-    }
-
-    @PostConstruct
-    public void init() {
-        instance = this;
-    }
-
-    private static final ConcurrentHashMap<String, TransactContainer> localTransactionMaps = new ConcurrentHashMap<>();
-
-    //获得 n毫秒之前完成但是没有进行提交或者回滚的本地事务
-    public ArrayList<TransactContainer> getUnDoTransactions(long millisecond) {
-        ArrayList<TransactContainer> transactContainers = new ArrayList<>();
-        localTransactionMaps.forEach((k, v) -> {
-            if (v.getSuccessTime() != null) {
-                transactContainers.add(v);
-            }
-        });//将所有已经成功的本地事务加入到list中
-        transactContainers.sort((o1, o2) -> o1.getSuccessTime().compareTo(o2.getSuccessTime()));
-        Long nowTime = TimeUtil.getNowTime();
-        ArrayList<TransactContainer> returnList = new ArrayList<>();
-        for (TransactContainer transactContainer : transactContainers) {
-            Date successTime = transactContainer.getSuccessTime();
-            if (nowTime - successTime.getTime() >= millisecond) {
-                returnList.add(transactContainer);
-            } else {
-                break;
-            }
+public  class LocalTransactionManager {
+        public static void setDbExecutor(ExecutorService executor){
+            dbExecutor=executor;
         }
-        return returnList;
-    }
+        private static ExecutorService dbExecutor = Executors.newFixedThreadPool(10);
+        @Autowired
+        private NotDoneSqlLogUtil notDoneSqlLogUtil;
+        @Autowired
+        BranchTransactRpcWebFlux branchTransactRpcWebFlux;
+        @Autowired
+        private GlobalTransactRpc globalTransactRpc;
+        @Autowired
+        private BranchTransactRpc branchTransactRpc;
+        @Autowired
+        private BranchTransactionUtil branchTransactionUtil;
 
-    public void begin(String globalId, DCSTransaction dcsTransaction) throws SQLException, UnknownHostException {
-        BranchTransaction branchTransaction = branchTransactionUtil.buildDefaultTransaction();
-        if (StringUtils.hasLength(globalId)) {//如果存在globalId那么就加入到当前的事务中
-            branchTransaction.setGlobalId(globalId);//设置所属的globalId
-            branchTransaction.setBranchId(branchTransactRpc.joinBranchTransaction(branchTransaction).getData().getBranchId());//加入到当前的事务中
-        } else {//如果不存在globalId那么就开启并加入一个新的分布式事务
-            BothTransaction bothTransaction = globalTransactRpc.createAndJoinGlobalTransaction(dcsTransaction.timeout(), branchTransaction).getData();
-            branchTransaction.setGlobalId(bothTransaction.getGlobalTransaction().getGlobalId());//设置globalId
-            branchTransaction.setBranchId(bothTransaction.getBranchTransaction().getBranchId());//设置branchId
+        @Autowired
+        private DataSourceTransactionManager transactionManager;
+        public static LocalTransactionManager instance;
+        public void updateLocalSuccessTime(String branchId){//修改本地事务的successTime
+            localTransactionMaps.get(branchId).setSuccessTime(new Date());
         }
-        DCSThreadContext.sqlRecodes.set(new ArrayList<>());
-        DCSThreadContext.globalId.set(branchTransaction.getGlobalId());//将该全局事务的id添加到当前的线程中
-        DCSThreadContext.isDscTransaction.set(true);
-        DCSThreadContext.branchTransaction.set(branchTransaction);
-        NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
-        this.addLogToDatabase(notDoneSqlLog);
-        this.buildLocalTransaction(branchTransaction);//创建一个本地事务.并将其与本地事务关联
-    }
+        @PostConstruct
+        public void init()
+        {
+            instance=this;
+        }
+        private static final ConcurrentHashMap<String, TransactContainer> localTransactionMaps=new ConcurrentHashMap<>();
 
-    //修改存储在服务端中的本地事务状态
-    public void updateStatus(BranchTransaction branchTransaction, BranchStatus branchStatus) {
-        branchTransaction.setStatus(branchStatus);
-        branchTransaction.setStatus(branchStatus);
-        branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//修改分支事务的状
-    }
-
-    public void updateStatusWithNotice(BranchTransaction branchTransaction, BranchStatus branchStatus) {
-        branchTransaction.setStatus(branchStatus);
-        branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);
-    }
-
-    public void updateStatus(BranchStatus branchStatus) {
-        BranchTransaction branchTransaction = DCSThreadContext.branchTransaction.get();
-        updateStatus(branchTransaction, branchStatus);
-    }
-
-    public void updateStatusWithNotice(BranchStatus branchStatus) throws InterruptedException {
-        BranchTransaction branchTransaction = DCSThreadContext.branchTransaction.get();
-        updateStatusWithNotice(branchTransaction, branchStatus);
-    }
-
-    private Connection buildLocalTransaction(BranchTransaction branchTransaction) throws SQLException//新建一个本地事务,并将其绑定到当前的线程中
-    {
-        ConnectionWrapper connection = new ConnectionWrapper(transactionManager.getDataSource().getConnection());
-        DCSThreadContext.connection.set(connection);
-        connection.setAutoCommit(false);
-        ConnectionHolder connectionHolder = new ConnectionHolder(connection);
-        TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(), connectionHolder);
-        localTransactionMaps.put(branchTransaction.getBranchId(), new TransactContainer(connection, branchTransaction));
-        return connection;
-    }
-
-    public ConnectionWrapper getLocalTransaction(String branchId) {
-        TransactContainer transactContainer = localTransactionMaps.get(branchId);
-        if (transactContainer == null) return null;
-        return transactContainer.getConnection();
-    }
-
-    public void removeLocalTransaction(String branchId) {
-        localTransactionMaps.remove(branchId);
-    }
-
-    //回滚事务
-    public void rollBack(String branchId, Boolean useFlux, Boolean notice) {
-        ConnectionWrapper connection = getConnection(branchId);
-        if (connection == null) return;
-        synchronized (connection) {
-            try {
-                if (connection.isClosed()) {
-                    localTransactionMaps.remove(branchId);
-                    return;
+        //获得 n毫秒之前完成但是没有进行提交或者回滚的本地事务
+        public ArrayList<TransactContainer> getUnDoTransactions(long millisecond){
+            ArrayList<TransactContainer> transactContainers=new ArrayList<>();
+            localTransactionMaps.forEach((k,v)->{
+                if(v.getSuccessTime()!=null){
+                    transactContainers.add(v);
                 }
-                ;
-                connection.rollback();
-                connection.setAutoCommit(true);
-                LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection, branchId);//从数据库中删除该未完成的事务
-                BranchTransaction branchTransaction = BranchTransaction.builder().branchId(branchId).status(BranchStatus.rollback).build();
-                if (!notice) {
-                    if (!useFlux) branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
-                    else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction);
-                } else if (notice) {
-                    if (!useFlux)
-                        branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);//更新服务端的分支事务状态 为回滚
-                    else branchTransactRpcWebFlux.updateBranchTransactionStatusWithNotice(branchTransaction);
+            });//将所有已经成功的本地事务加入到list中
+            transactContainers.sort((o1, o2) -> o1.getSuccessTime().compareTo(o2.getSuccessTime()));
+            Long nowTime=TimeUtil.getNowTime();
+            ArrayList<TransactContainer> returnList=new ArrayList<>();
+            for (TransactContainer transactContainer :  transactContainers){
+                Date successTime=transactContainer.getSuccessTime();
+                if(nowTime-successTime.getTime()>=millisecond){
+                    returnList.add(transactContainer);
+                }else{
+                    break;
                 }
-            } catch (SQLException sqlException) {
-                throw new DcsTransactionError(sqlException.getMessage());
-            } finally {
+            }
+            return returnList;
+        }
+        public void begin(String globalId, DCSTransaction dcsTransaction) throws SQLException, UnknownHostException {
+                BranchTransaction branchTransaction=branchTransactionUtil.buildDefaultTransaction();
+                if(StringUtils.hasLength(globalId)){//如果存在globalId那么就加入到当前的事务中
+                    branchTransaction.setGlobalId(globalId);//设置所属的globalId
+                    branchTransaction.setBranchId(branchTransactRpc.joinBranchTransaction(branchTransaction).getData().getBranchId());//加入到当前的事务中
+                }
+                else{//如果不存在globalId那么就开启并加入一个新的分布式事务
+                    BothTransaction bothTransaction=globalTransactRpc.createAndJoinGlobalTransaction(dcsTransaction.timeout(),branchTransaction).getData();
+                    branchTransaction.setGlobalId(bothTransaction.getGlobalTransaction().getGlobalId());//设置globalId
+                    branchTransaction.setBranchId(bothTransaction.getBranchTransaction().getBranchId());//设置branchId
+                }
+                DCSThreadContext.sqlRecodes.set(new ArrayList<>());
+                DCSThreadContext.globalId.set(branchTransaction.getGlobalId());//将该全局事务的id添加到当前的线程中
+                DCSThreadContext.isDscTransaction.set(true);
+                DCSThreadContext.branchTransaction.set(branchTransaction);
+                NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
+                this.addLogToDatabase(notDoneSqlLog);
+                this.buildLocalTransaction(branchTransaction);//创建一个本地事务.并将其与本地事务关联
+        }
+        //修改存储在服务端中的本地事务状态
+        public void updateStatus(BranchTransaction branchTransaction, BranchStatus branchStatus) {
+             branchTransaction.setStatus(branchStatus);
+             branchTransaction.setStatus(branchStatus);
+             branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//修改分支事务的状
+         }
+        public void updateStatusWithNotice(BranchTransaction branchTransaction, BranchStatus branchStatus){
+            branchTransaction.setStatus(branchStatus);
+            branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);
+        }
+        public void updateStatus(BranchStatus branchStatus){
+            BranchTransaction branchTransaction= DCSThreadContext.branchTransaction.get();
+            updateStatus(branchTransaction, branchStatus);
+        }
+        public void updateStatusWithNotice(BranchStatus branchStatus) throws InterruptedException {
+             BranchTransaction branchTransaction= DCSThreadContext.branchTransaction.get();
+             updateStatusWithNotice(branchTransaction, branchStatus);
+        }
+        private Connection buildLocalTransaction(BranchTransaction branchTransaction) throws  SQLException//新建一个本地事务,并将其绑定到当前的线程中
+        {
+            ConnectionWrapper connection=new ConnectionWrapper(transactionManager.getDataSource().getConnection());
+            DCSThreadContext.connection.set(connection);
+            connection.setAutoCommit(false);
+            ConnectionHolder connectionHolder=new ConnectionHolder(connection);
+            TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(),connectionHolder);
+            localTransactionMaps.put(branchTransaction.getBranchId(),new TransactContainer(connection,branchTransaction));
+            return connection;
+        }
+        public ConnectionWrapper getLocalTransaction(String branchId)
+        {
+            TransactContainer transactContainer=localTransactionMaps.get(branchId);
+            if(transactContainer==null) return null;
+            return  transactContainer.getConnection();
+        }
+        public void removeLocalTransaction(String branchId){
+            localTransactionMaps.remove(branchId);
+        }
+        //回滚事务
+        public void rollBack(String branchId,Boolean useFlux,Boolean notice) {
+            ConnectionWrapper connection=getLocalTransaction(branchId);
+            if (connection==null) return;
+            synchronized (connection){
                 try {
-                    if (!connection.isClosed()) connection.close();
-                } catch (SQLException sqlException) {
+                    if (connection.isClosed()){
+                        localTransactionMaps.remove(branchId);
+                        return;
+                    };
+                    connection.rollback();
+                    connection.setAutoCommit(true);
+                    LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
+                    BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.rollback).build();
+                    if(!notice){
+                        if(!useFlux)  branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
+                        else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction);
+                    }
+                    else if(notice){
+                        if(!useFlux)  branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);//更新服务端的分支事务状态 为回滚
+                        else branchTransactRpcWebFlux.updateBranchTransactionStatusWithNotice(branchTransaction);
+                    }
+                }catch (SQLException sqlException){
                     throw new DcsTransactionError(sqlException.getMessage());
                 }
+                finally {
+                    try {
+                        if(!connection.isClosed())  connection.close();
+                    } catch (SQLException sqlException) {
+                        throw new DcsTransactionError(sqlException.getMessage());
+                    }
+                }
             }
         }
-    }
-
-    public void rollBackByThreadPoolAndWebFlux(String branchId) {
-        dbExecutor.submit(() -> {
-            rollBack(branchId, true, false);
-        });
-    }
-
-    public void commitByThreadPoolAndWebFlux(String branchId) {
-        dbExecutor.submit(() -> {
-            commit(branchId, true);
-        });
-    }
-
-    //提交事务
-    public void commit(String branchId, Boolean useFlux) {
-        ConnectionWrapper connection = getConnection(branchId);
-        if (connection == null) return;
-        synchronized (connection) {
-            try {
-                if (connection.isClosed()) {
+        public void rollBackByThreadPoolAndWebFlux(String branchId){
+            dbExecutor.submit(()->{
+                rollBack(branchId,true,false);
+            });
+        }
+        public void commitByThreadPoolAndWebFlux(String branchId){
+            dbExecutor.submit(()->{
+                    commit(branchId,true);
+            });
+        }
+        //提交事务
+        public void commit(String branchId,Boolean useFlux)   {
+            ConnectionWrapper connection=getLocalTransaction(branchId);
+            if (connection==null) return;
+            synchronized (connection){
+                try{
+                if (connection.isClosed()){
                     localTransactionMaps.remove(branchId);
                     return;
+                };
+                    LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
+                    connection.commit();//提交事务 与上一个为同一事务 确保原子性
+                    BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.commit).build();
+                    if(!useFlux) branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态
+                    else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction);
+                } catch (SQLException e) {
+                   throw new DcsTransactionError(e.getMessage());
+                } finally {
+                    try {
+                        if(!connection.isClosed()) connection.close();
+                    } catch (SQLException e) {
+                        throw new DcsTransactionError(e.getMessage());
+                    }
+                    localTransactionMaps.remove(branchId);
                 }
-                ;
-                LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection, branchId);//从数据库中删除该未完成的事务
-                connection.commit();//提交事务 与上一个为同一事务 确保原子性
-                BranchTransaction branchTransaction = BranchTransaction.builder().branchId(branchId).status(BranchStatus.commit).build();
-                if (!useFlux) branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态
-                else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction);
+            }
+
+        }
+        public void updateLogOfDBS(NotDoneSqlLog notDoneSqlLog){
+            String sql = "update not_done_sql_log set logs= ? where branch_id= ?";
+            Connection connection = null;
+            PreparedStatement preparedStatement = null;
+            try {
+                connection = transactionManager.getDataSource().getConnection();
+                preparedStatement = connection.prepareStatement(sql);
+                //设置参数
+                preparedStatement.setString(1, notDoneSqlLog.getLogs());
+                preparedStatement.setString(2, notDoneSqlLog.getBranchId());
+                preparedStatement.executeUpdate();
             } catch (SQLException e) {
-                throw new DcsTransactionError(e.getMessage());
+                throw new RuntimeException(e);
+            }
+            finally {
+                // 关闭资源
+                if (preparedStatement != null) {
+                    try {
+                        preparedStatement.close();
+                    } catch (SQLException e) {
+                    }
+                }
+                if (connection != null) {
+                    try {
+                        connection.close();
+                    } catch (SQLException e) {
+                    }
+                }
+            }
+        }
+
+
+        public void addLogToDatabase(NotDoneSqlLog notDoneSqlLog) throws SQLException {
+            String sql = "insert into not_done_sql_log(global_id, branch_id, begin_time, request_uri,application_name,server_address,logs) values (?, ? , ? , ?, ?, ?, ?)";
+            Connection connection = null;
+            PreparedStatement preparedStatement = null;
+            try {
+                connection = transactionManager.getDataSource().getConnection();
+                preparedStatement = connection.prepareStatement(sql);
+                // 设置参数
+                preparedStatement.setString(1, notDoneSqlLog.getGlobalId());
+                preparedStatement.setString(2, notDoneSqlLog.getBranchId());
+                preparedStatement.setTimestamp(3, new Timestamp(TimeUtil.strToDate(notDoneSqlLog.getBeginTime()).getTime()));
+                preparedStatement.setString(4, notDoneSqlLog.getRequestUri());
+                preparedStatement.setString(5, notDoneSqlLog.getApplicationName());
+                preparedStatement.setString(6, notDoneSqlLog.getServerAddress());
+                preparedStatement.setString(7, notDoneSqlLog.getLogs());
+                // 执行插入操作
+                preparedStatement.executeUpdate();
+            } catch (SQLException e) {
+                // 记录日志或其他处理逻辑
+                throw new SQLException("Error inserting log into database", e);
             } finally {
-                try {
-                    if (!connection.isClosed()) connection.close();
-                } catch (SQLException e) {
-                    throw new DcsTransactionError(e.getMessage());
+                // 关闭资源
+                if (preparedStatement != null) {
+                    try {
+                        preparedStatement.close();
+                    } catch (SQLException e) {
+                    }
                 }
-                localTransactionMaps.remove(branchId);
+                if (connection != null) {
+                    try {
+                        connection.close();
+                    } catch (SQLException e) {
+                    }
+                }
             }
-        }
-
     }
-
-    public void updateLogOfDBS(NotDoneSqlLog notDoneSqlLog) {
-        String sql = "update not_done_sql_log set logs= ? where branch_id= ?";
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        try {
-            connection = transactionManager.getDataSource().getConnection();
-            preparedStatement = connection.prepareStatement(sql);
-            //设置参数
-            preparedStatement.setString(1, notDoneSqlLog.getLogs());
-            preparedStatement.setString(2, notDoneSqlLog.getBranchId());
-            preparedStatement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        } finally {
-            // 关闭资源
-            if (preparedStatement != null) {
-                try {
-                    preparedStatement.close();
-                } catch (SQLException e) {
-                }
-            }
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                }
-            }
+        public void deleteUnDoLogFromDatabase(ConnectionWrapper connection,String branchId) throws SQLException {
+             String sql = "delete from not_done_sql_log where  branch_id = ?";
+             PreparedStatement preparedStatement = null;
+             try {
+                 preparedStatement = connection.prepareStatementWithoutWrapper(sql);
+                 // 设置参数
+                 preparedStatement.setString(1, branchId);
+                 preparedStatement.executeUpdate();
+             }
+             catch (SQLException e) {
+                 // 记录日志或其他处理逻辑
+                 throw new SQLException("Error deleting log from database", e);
+             }
         }
-    }
-
-
-    public void addLogToDatabase(NotDoneSqlLog notDoneSqlLog) throws SQLException {
-        String sql = "insert into not_done_sql_log(global_id, branch_id, begin_time, request_uri,application_name,server_address,logs) values (?, ? , ? , ?, ?, ?, ?)";
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        try {
-            connection = transactionManager.getDataSource().getConnection();
-            preparedStatement = connection.prepareStatement(sql);
-            // 设置参数
-            preparedStatement.setString(1, notDoneSqlLog.getGlobalId());
-            preparedStatement.setString(2, notDoneSqlLog.getBranchId());
-            preparedStatement.setTimestamp(3, new Timestamp(TimeUtil.strToDate(notDoneSqlLog.getBeginTime()).getTime()));
-            preparedStatement.setString(4, notDoneSqlLog.getRequestUri());
-            preparedStatement.setString(5, notDoneSqlLog.getApplicationName());
-            preparedStatement.setString(6, notDoneSqlLog.getServerAddress());
-            preparedStatement.setString(7, notDoneSqlLog.getLogs());
-            // 执行插入操作
-            preparedStatement.executeUpdate();
-        } catch (SQLException e) {
-            // 记录日志或其他处理逻辑
-            throw new SQLException("Error inserting log into database", e);
-        } finally {
-            // 关闭资源
-            if (preparedStatement != null) {
-                try {
-                    preparedStatement.close();
-                } catch (SQLException e) {
-                }
-            }
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                }
-            }
-        }
-    }
-
-    public void deleteUnDoLogFromDatabase(ConnectionWrapper connection, String branchId) throws SQLException {
-        String sql = "delete from not_done_sql_log where  branch_id = ?";
-        PreparedStatement preparedStatement = null;
-        try {
-            preparedStatement = connection.prepareStatementWithoutWrapper(sql);
-            // 设置参数
-            preparedStatement.setString(1, branchId);
-            preparedStatement.executeUpdate();
-        } catch (SQLException e) {
-            // 记录日志或其他处理逻辑
-            throw new SQLException("Error deleting log from database", e);
-        }
-    }
 }
 
 

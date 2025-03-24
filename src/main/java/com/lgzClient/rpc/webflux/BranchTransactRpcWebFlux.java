@@ -15,5 +15,5 @@ public interface BranchTransactRpcWebFlux {
     Mono<Void> updateBranchTransactionStatus(@RequestBody BranchTransaction branchTransaction);
 
     @PutMapping("/branchTransaction/status/notice")
-    Mono<Void> updateBranchTransactionStatusWithNotice(@RequestBody BranchTransaction branchTransaction);
+    Mono< Void> updateBranchTransactionStatusWithNotice(@RequestBody BranchTransaction branchTransaction);
 }

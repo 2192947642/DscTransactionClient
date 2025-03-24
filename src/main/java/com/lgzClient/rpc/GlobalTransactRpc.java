@@ -20,4 +20,7 @@ public interface GlobalTransactRpc {
     Result<ArrayList<GlobalTransaction>> getGlobalTransactions(@RequestParam("globalIds")ArrayList<String> globalIds);
     @PostMapping("/globalTransaction/createAndJoin")
     Result<BothTransaction> createAndJoinGlobalTransaction(@RequestParam("timeout") Long timeout, @RequestBody BranchTransaction branchTransaction);
+    @PostMapping("/globalTransaction")
+    void deleteGlobalTransaction(@RequestParam("globalId") String globalId);
+
 }

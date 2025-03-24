@@ -158,12 +158,12 @@ public  class LocalTransactionManager {
                     LocalTransactionManager.instance.deleteUnDoLogFromDatabase(connection,branchId);//从数据库中删除该未完成的事务
                     BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.rollback).build();
                     if(!notice){
-                        if(!useFlux)  branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
-                        else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction);
+                        if(!useFlux) branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
+                        else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();
                     }
                     else if(notice){
-                        if(!useFlux)  branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);//更新服务端的分支事务状态 为回滚
-                        else branchTransactRpcWebFlux.updateBranchTransactionStatusWithNotice(branchTransaction);
+                        if(!useFlux) branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);//更新服务端的分支事务状态 为回滚
+                        else branchTransactRpcWebFlux.updateBranchTransactionStatusWithNotice(branchTransaction).subscribe();
                     }
                 }catch (SQLException sqlException){
                     throw new DcsTransactionError(sqlException.getMessage());
@@ -201,7 +201,7 @@ public  class LocalTransactionManager {
                     connection.commit();//提交事务 与上一个为同一事务 确保原子性
                     BranchTransaction branchTransaction= BranchTransaction.builder().branchId(branchId).status(BranchStatus.commit).build();
                     if(!useFlux) branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态
-                    else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction);
+                    else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();
                 } catch (SQLException e) {
                    throw new DcsTransactionError(e.getMessage());
                 } finally {

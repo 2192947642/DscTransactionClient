@@ -28,7 +28,8 @@ public class GlobalTransactRpcImpl implements GlobalTransactRpc {
                 url,
                 HttpMethod.GET,
                 null,
-                new ParameterizedTypeReference<Result<GlobalTransaction>>() {}
+                new ParameterizedTypeReference<>() {
+                }
         );
         return response.getBody();
     }
@@ -70,5 +71,11 @@ public class GlobalTransactRpcImpl implements GlobalTransactRpc {
                 new ParameterizedTypeReference<Result<BothTransaction>>() {}
         );
         return response.getBody();
+    }
+
+    @Override
+    public void deleteGlobalTransaction(String globalId) {
+        String url = prefix+"/globalTransaction?globalId=" + globalId;
+        restTemplate.delete(url);
     }
 }

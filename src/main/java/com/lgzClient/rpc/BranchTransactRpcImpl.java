@@ -24,7 +24,8 @@ public class BranchTransactRpcImpl implements BranchTransactRpc {
                 url,
                 HttpMethod.GET,
                 null,
-                new ParameterizedTypeReference<Result<BranchTransaction>>() {}
+                new ParameterizedTypeReference<>() {
+                }
         );
         return response.getBody();
     }
@@ -43,40 +44,32 @@ public class BranchTransactRpcImpl implements BranchTransactRpc {
     }
 
     @Override
-    public Result<BranchTransaction> deleteBranchTransaction(String branchId) {
+    public void deleteBranchTransaction(String branchId) {
         String url = prefix+"/branchTransaction?branchId=" + branchId;
-        ResponseEntity<Result<BranchTransaction>> response = restTemplate.exchange(
-                url,
-                HttpMethod.DELETE,
-                null,
-                new ParameterizedTypeReference<Result<BranchTransaction>>() {}
-        );
-        return response.getBody();
+        restTemplate.delete(url);
     }
 
     @Override
-    public Result<BranchTransaction> updateBranchTransactionStatus(BranchTransaction branchTransaction) {
+    public void updateBranchTransactionStatus(BranchTransaction branchTransaction) {
         String url = prefix+"/branchTransaction/status";
         HttpEntity<BranchTransaction> request = new HttpEntity<>(branchTransaction);
-        ResponseEntity<Result<BranchTransaction>> response = restTemplate.exchange(
+        restTemplate.exchange(
                 url,
                 HttpMethod.PUT,
                 request,
-                new ParameterizedTypeReference<Result<BranchTransaction>>() {}
+                Void.class
         );
-        return response.getBody();
     }
 
     @Override
-    public Result<BranchTransaction> updateBranchTransactionStatusWithNotice(BranchTransaction branchTransaction) {
+    public void updateBranchTransactionStatusWithNotice(BranchTransaction branchTransaction) {
         String url = prefix+"/branchTransaction/status/notice";
         HttpEntity<BranchTransaction> request = new HttpEntity<>(branchTransaction);
-        ResponseEntity<Result<BranchTransaction>> response = restTemplate.exchange(
+        restTemplate.exchange(
                 url,
                 HttpMethod.PUT,
                 request,
-                new ParameterizedTypeReference<Result<BranchTransaction>>() {}
+                Void.class
         );
-        return response.getBody();
     }
 }

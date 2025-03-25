@@ -5,6 +5,7 @@ import com.lgzClient.types.sql.client.NotDoneSqlLog;
 import com.lgzClient.types.sql.recode.*;
 import com.lgzClient.types.sql.service.BranchTransaction;
 import com.lgzClient.wrapper.ConnectionWrapper;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,11 @@ import java.util.HashMap;
 public class NotDoneSqlLogUtil {
     @Autowired
     DataSourceTransactionManager transactionManager;
+    private Connection connection;
+    @PostConstruct
+    public void init() throws SQLException {
+        connection=transactionManager.getDataSource().getConnection();
+    }
     public NotDoneSqlLog buildUndoSqlLogFromLocalBranchTransaction(BranchTransaction branchTransaction){
         NotDoneSqlLog notDoneSqlLog =new NotDoneSqlLog();
         notDoneSqlLog.setBranchId(branchTransaction.getBranchId());
@@ -53,10 +59,8 @@ public class NotDoneSqlLogUtil {
     }
     public void addLogToDatabase(NotDoneSqlLog notDoneSqlLog) throws SQLException {
         String sql = "insert into not_done_sql_log(global_id, branch_id, begin_time, request_uri,application_name,server_address,logs) values (?, ? , ? , ?, ?, ?, ?)";
-        Connection connection = null;
         PreparedStatement preparedStatement = null;
         try {
-            connection = transactionManager.getDataSource().getConnection();
             preparedStatement = connection.prepareStatement(sql);
             // 设置参数
             preparedStatement.setString(1, notDoneSqlLog.getGlobalId());
@@ -79,20 +83,12 @@ public class NotDoneSqlLogUtil {
                 } catch (SQLException e) {
                 }
             }
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                }
-            }
         }
     }
     public void updateLogOfDBS(NotDoneSqlLog notDoneSqlLog){
         String sql = "update not_done_sql_log set logs= ? where branch_id= ?";
-        Connection connection = null;
         PreparedStatement preparedStatement = null;
         try {
-            connection = transactionManager.getDataSource().getConnection();
             preparedStatement = connection.prepareStatement(sql);
             //设置参数
             preparedStatement.setString(1, notDoneSqlLog.getLogs());
@@ -106,12 +102,6 @@ public class NotDoneSqlLogUtil {
             if (preparedStatement != null) {
                 try {
                     preparedStatement.close();
-                } catch (SQLException e) {
-                }
-            }
-            if (connection != null) {
-                try {
-                    connection.close();
                 } catch (SQLException e) {
                 }
             }

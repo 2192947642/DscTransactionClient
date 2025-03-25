@@ -115,7 +115,6 @@ public class LocalTransactionManager {
 
     //分布式连接开启
     public void begin(String globalId, DCSTransaction dcsTransaction) throws SQLException, UnknownHostException, InterruptedException {
-
         BranchTransaction branchTransaction = branchTransactionUtil.buildDefaultTransaction();
         if (StringUtils.hasLength(globalId)) {//如果存在globalId那么就加入到当前的事务中
             branchTransaction.setGlobalId(globalId);//设置所属的globalId
@@ -126,8 +125,6 @@ public class LocalTransactionManager {
             branchTransaction.setBranchId(bothTransaction.getBranchTransaction().getBranchId());//设置branchId
         }
         DCSThreadContext.init(branchTransaction);//对ThreadLocal中的数据进行初始化
-        NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
-        notDoneSqlLogUtil.addLogToDatabase(notDoneSqlLog);
         this.buildLocalTransaction(branchTransaction);//创建一个本地事务.并将其与本地事务关联
     }
 
@@ -145,7 +142,10 @@ public class LocalTransactionManager {
 
     private Connection buildLocalTransaction(BranchTransaction branchTransaction) throws SQLException, InterruptedException//新建一个本地事务,并将其绑定到当前的线程中
     {
-        connectionSemaphore.acquire();//申请一个连接资源·········
+        connectionSemaphore.acquire(clientConfig.getCheckTimeOutIntervalPersonal());//申请一个连接资源·········
+        //如果有多余的连接资源 那么就添加notDoneSqlLog
+        NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
+        notDoneSqlLogUtil.addLogToDatabase(notDoneSqlLog);
         ConnectionWrapper connection = new ConnectionWrapper(transactionManager.getDataSource().getConnection());
         DCSThreadContext.connection.set(connection);
         connection.setAutoCommit(false);
@@ -167,8 +167,12 @@ public class LocalTransactionManager {
 
     //回滚事务
     public void rollBack(String branchId, Boolean useFlux, Boolean notice) {
-        ConnectionWrapper connection = getConnection(branchId);
-        if (connection == null) return;
+        ConnectionWrapper connection = getConnection(branchId); //检测是否 设置了连接
+        if (connection == null){//如果没有连接那么说明 是超时了,此时只需要对服务器进行通知就行了
+            BranchTransaction branchTransaction = BranchTransaction.builder().globalId(DCSThreadContext.globalId.get()).branchId(branchId).status(BranchStatus.rollback).build();
+            branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();
+            return;
+        }
         synchronized (connection) {
             try {
                 if(connection.isClosed()) return;

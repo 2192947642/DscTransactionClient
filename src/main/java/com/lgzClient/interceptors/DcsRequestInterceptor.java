@@ -36,7 +36,7 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)  {
         if(DCSThreadContext.isDscTransaction.get()==null|| DCSThreadContext.isDscTransaction.get()!=true) return;
         if(request.getAttribute(DcsAfterHandlerOnce)!=null){//如果已经执行过了就直接返回
             return;
@@ -44,9 +44,12 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
         if(request.getAttribute(DcsAfterHandlerOnce)!=null){
             request.setAttribute(DcsAfterHandlerOnce,1);
         } //接触与本地事务的关联
-        TransactionSynchronizationManager.clear();
-        TransactionSynchronizationManager.unbindResource(dataSourceTransactionManager.getDataSource());//解除关联
-        DCSThreadContext.removeAll();
+        try {
+            TransactionSynchronizationManager.clear();
+            TransactionSynchronizationManager.unbindResource(dataSourceTransactionManager.getDataSource());//解除关联
+        }finally {
+            DCSThreadContext.removeAll();
+        }
     }
 
 }

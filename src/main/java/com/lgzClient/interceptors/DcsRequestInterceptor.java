@@ -45,8 +45,10 @@ public class DcsRequestInterceptor implements HandlerInterceptor {
             request.setAttribute(DcsAfterHandlerOnce,1);
         } //接触与本地事务的关联
         try {
-            TransactionSynchronizationManager.clear();
-            TransactionSynchronizationManager.unbindResource(dataSourceTransactionManager.getDataSource());//解除关联
+            if(DCSThreadContext.connection.get()!=null){//如果当前线程获得了数据库连接那么解绑
+                TransactionSynchronizationManager.clear();
+                TransactionSynchronizationManager.unbindResource(dataSourceTransactionManager.getDataSource());//解除关联
+            }
         }finally {
             DCSThreadContext.removeAll();
         }

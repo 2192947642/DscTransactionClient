@@ -16,9 +16,10 @@ public class ClientConfig {
     {
         instance=this;
     }
-    @Value("${spring.cloud.dcstransaction.checkTransactionTimeOutInterval:5000}")
-    public  int checkTimeOutInterval;//检查
-
+    @Value("${spring.cloud.dcstransaction.checkTransactionTimeOutIntervalWaitOthers:6000}")
+    public  int checkTimeOutIntervalWaitOthers;//检查
+    @Value("${spring.cloud.dcstransaction.checkTransactionTimeOutIntervalPersonal:5000}")
+    public  int checkTimeOutIntervalPersonal;//检查
     @Value("${spring.cloud.dcstransaction.reconnectInterval:5000}")
     public  int reconnectInterval;//重连的间隔,单位s
 }

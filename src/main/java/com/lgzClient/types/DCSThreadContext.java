@@ -13,7 +13,7 @@ public class DCSThreadContext {
     public static final ThreadLocal<Connection> recodeConnection=new ThreadLocal<Connection>();//用于进行本地事务信息的记录
     public static final ThreadLocal<ArrayList<Object>> sqlRecodes=new ThreadLocal<ArrayList<Object>>();
     public static final ThreadLocal<BranchTransaction> branchTransaction =new ThreadLocal<BranchTransaction>();
-    public static final ThreadLocal<Boolean> isDscTransaction=new ThreadLocal<Boolean>();
+    public static final ThreadLocal<Boolean> isDscTransaction= new ThreadLocal<>();
 
     public static void setGlobalId(String globalId){
         DCSThreadContext.globalId.set(globalId);

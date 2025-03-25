@@ -24,8 +24,10 @@ public class DCSResponseAdvice implements  ResponseBodyAdvice<Object> {
     LocalTransactionManager localTransactionManager;
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-
-        return DCSThreadContext.isDscTransaction!=null&&DCSThreadContext.isDscTransaction.get()==true;
+        if(DCSThreadContext.isDscTransaction.get()==null||DCSThreadContext.isDscTransaction.get()==false){
+            return false;
+        }
+        return true;
     }
     @Override
     public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType, Class<? extends HttpMessageConverter<?>> selectedConverterType, ServerHttpRequest request, ServerHttpResponse response) {

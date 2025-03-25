@@ -537,42 +537,43 @@ import java.util.concurrent.TimeUnit;
 public class TimeOutConnectionHandler {
     @Autowired
     ClientConfig clientConfig;
+
     @PostConstruct
-    public void init(){
-        Executors.newScheduledThreadPool(1).scheduleWithFixedDelay(()->{
+    public void init() {
+        Executors.newScheduledThreadPool(1).scheduleWithFixedDelay(() -> {
             try {
                 checkTimeOut();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        },0,clientConfig.checkTimeOutInterval, TimeUnit.MILLISECONDS);
+        }, 0, clientConfig.checkTimeOutInterval, TimeUnit.MILLISECONDS);
     }
 
     @Autowired
     GlobalTransactRpc globalTransactRpc;
     @Autowired
     LocalTransactionManager localTransactionManager;
+
     //超时检查
     public void checkTimeOut() {
-        ArrayList<TransactContainer> transactContainers 	=localTransactionManager.getUnDoTransactions(clientConfig.checkTimeOutInterval);
-        if(transactContainers.size()==0) return;
-        ArrayList<String> globalIds=new ArrayList<>();
+        ArrayList<TransactContainer> transactContainers = localTransactionManager.getUnDoTransactionsWaitOther(clientConfig.checkTimeOutInterval);
+        if (transactContainers.size() == 0) return;
+        ArrayList<String> globalIds = new ArrayList<>();
         for (TransactContainer transactContainer : transactContainers) {
-            String globalId=transactContainer.getBranchTransaction().getGlobalId();
+            String globalId = transactContainer.getBranchTransaction().getGlobalId();
             globalIds.add(globalId);
         }
-        ArrayList<GlobalTransaction> globalTransactions=globalTransactRpc.getGlobalTransactions(globalIds).getData();
-        HashMap<String ,GlobalTransaction> globalTransactionHashMap=new HashMap<>();
+        ArrayList<GlobalTransaction> globalTransactions = globalTransactRpc.getGlobalTransactions(globalIds).getData();
+        HashMap<String, GlobalTransaction> globalTransactionHashMap = new HashMap<>();
         for (GlobalTransaction globalTransaction : globalTransactions) {
-            globalTransactionHashMap.put(globalTransaction.getGlobalId(),globalTransaction);
+            globalTransactionHashMap.put(globalTransaction.getGlobalId(), globalTransaction);
         }
-        for (TransactContainer transactContainer : transactContainers){
-            String globalId=transactContainer.getBranchTransaction().getGlobalId();
-            String branchId=transactContainer.getBranchTransaction().getBranchId();
-            if(globalTransactionHashMap.get(globalId).getStatus() == GlobalStatus.fail){
+        for (TransactContainer transactContainer : transactContainers) {
+            String globalId = transactContainer.getBranchTransaction().getGlobalId();
+            String branchId = transactContainer.getBranchTransaction().getBranchId();
+            if (globalTransactionHashMap.get(globalId).getStatus() == GlobalStatus.fail) {
                 localTransactionManager.rollBackByThreadPoolAndWebFlux(branchId);
-            }
-            else if(globalTransactionHashMap.get(globalId).getStatus()== GlobalStatus.success){
+            } else if (globalTransactionHashMap.get(globalId).getStatus() == GlobalStatus.success) {
                 localTransactionManager.commitByThreadPoolAndWebFlux(branchId);
             }
         }

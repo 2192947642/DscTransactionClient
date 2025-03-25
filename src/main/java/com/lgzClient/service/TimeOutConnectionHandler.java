@@ -9,6 +9,7 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
@@ -26,16 +27,32 @@ public class TimeOutConnectionHandler {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        },0,clientConfig.checkTimeOutInterval, TimeUnit.MILLISECONDS);
+        },0,clientConfig.checkTimeOutIntervalWaitOthers, TimeUnit.MILLISECONDS);
+        Executors.newScheduledThreadPool(1).scheduleWithFixedDelay(()->{
+            try {
+                checkTimeOutPersonal();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        },0,clientConfig.checkTimeOutIntervalPersonal, TimeUnit.MILLISECONDS);
+
     }
 
     @Autowired
     GlobalTransactRpc globalTransactRpc;
     @Autowired
     LocalTransactionManager localTransactionManager;
-    //超时检查
+    //本地超时检查，避免数据库连接被长时间占用
+    public void checkTimeOutPersonal(){
+        ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactionsPersonal(clientConfig.checkTimeOutIntervalPersonal);
+        if(transactContainers.size()==0) return;
+        for(TransactContainer transactContainer : transactContainers){
+           localTransactionManager.rollBackByThreadPoolAndWebFlux(transactContainer.getBranchTransaction().getBranchId());
+        }
+    }
+    //远程超时检查
     public void checkTimeOut() {
-        ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactions(clientConfig.checkTimeOutInterval);
+        ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactionsWaitOther(clientConfig.checkTimeOutIntervalWaitOthers);
         if(transactContainers.size()==0) return;
         ArrayList<String> globalIds=new ArrayList<>();
         for (TransactContainer transactContainer : transactContainers) {

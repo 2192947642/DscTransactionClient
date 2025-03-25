@@ -11,7 +11,13 @@ public class TransactContainer {
         this.connection=connection;
         this.branchTransaction=branchTransaction;
     }
+    public TransactContainer(ConnectionWrapper connection,BranchTransaction branchTransaction,Long beginTime){
+        this.connection=connection;
+        this.beginTime=beginTime;
+        this.branchTransaction=branchTransaction;
+    }
     BranchTransaction branchTransaction;//本地分支事务
     ConnectionWrapper connection;
-    Date successTime;//本地分支事务执行成功的时间
+    Long beginTime;//事务开启的时间
+    Long successTime;//本地分支事务执行成功的时间
 }

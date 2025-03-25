@@ -28,7 +28,6 @@ import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -57,7 +56,7 @@ public class LocalTransactionManager {
     public static LocalTransactionManager instance;
 
     public void updateLocalSuccessTime(String branchId) {//修改本地事务的successTime
-        localTransactionMaps.get(branchId).setSuccessTime(new Date());
+        localTransactionMaps.get(branchId).setSuccessTime(System.currentTimeMillis());
     }
 
     @PostConstruct
@@ -66,9 +65,31 @@ public class LocalTransactionManager {
     }
 
     private static final ConcurrentHashMap<String, TransactContainer> localTransactionMaps = new ConcurrentHashMap<>();
+    
+    //获得个人执行了n毫秒后还没有执行完的事务
 
-    //获得 n毫秒之前完成但是没有进行提交或者回滚的本地事务
-    public ArrayList<TransactContainer> getUnDoTransactions(long millisecond) {
+    public ArrayList<TransactContainer> getUnDoTransactionsPersonal(long millisecond) {
+        ArrayList<TransactContainer> transactContainers = new ArrayList<>();
+        localTransactionMaps.forEach((k, v) -> {
+            transactContainers.add(v);
+        });//将所有已经成功的本地事务加入到list中
+        transactContainers.sort((o1, o2) -> o1.getBeginTime().compareTo(o2.getBeginTime()));
+        Long nowTime = TimeUtil.getNowTime();
+        ArrayList<TransactContainer> returnList = new ArrayList<>();
+        for (TransactContainer transactContainer : transactContainers) {
+            Long successTime = transactContainer.getSuccessTime();
+            if (nowTime - successTime >= millisecond) {
+                returnList.add(transactContainer);
+            } else {
+                break;
+            }
+        }
+        return returnList;
+    }
+
+    //获得 n毫秒之前完成（等待其他分支事务状态）但是没有进行提交或者回滚的本地事务
+
+    public ArrayList<TransactContainer> getUnDoTransactionsWaitOther(long millisecond) {
         ArrayList<TransactContainer> transactContainers = new ArrayList<>();
         localTransactionMaps.forEach((k, v) -> {
             if (v.getSuccessTime() != null) {
@@ -79,8 +100,8 @@ public class LocalTransactionManager {
         Long nowTime = TimeUtil.getNowTime();
         ArrayList<TransactContainer> returnList = new ArrayList<>();
         for (TransactContainer transactContainer : transactContainers) {
-            Date successTime = transactContainer.getSuccessTime();
-            if (nowTime - successTime.getTime() >= millisecond) {
+            Long successTime = transactContainer.getSuccessTime();
+            if (nowTime - successTime >= millisecond) {
                 returnList.add(transactContainer);
             } else {
                 break;
@@ -124,7 +145,7 @@ public class LocalTransactionManager {
         connection.setAutoCommit(false);
         ConnectionHolder connectionHolder = new ConnectionHolder(connection);
         TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(), connectionHolder);
-        localTransactionMaps.put(branchTransaction.getBranchId(), new TransactContainer(connection, branchTransaction));
+        localTransactionMaps.put(branchTransaction.getBranchId(), new TransactContainer(connection, branchTransaction,System.currentTimeMillis()));
         return connection;
     }
 

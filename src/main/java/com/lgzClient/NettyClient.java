@@ -1,5 +1,6 @@
 package com.lgzClient;
 
+import com.lgzClient.configure.ClientConfig;
 import com.lgzClient.exceptions.DcsTransactionError;
 import com.lgzClient.types.Message;
 import com.lgzClient.utils.JsonUtil;
@@ -114,7 +115,7 @@ public class NettyClient {
                     if(channel!=null&&channel.isActive()){
                         LockSupport.park();
                     }
-                    Thread.sleep(ClientConfig.getInstance().reconnectInterval);
+                    Thread.sleep(ClientConfig.getInstance().getReconnectInterval());
                     connect();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

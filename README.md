@@ -519,7 +519,7 @@ public  class LocalTransactionManager {
 ```java
 package com.lgzClient.service;
 
-import com.lgzClient.ClientConfig;
+import com.lgzClient.configure.ClientConfig;
 import com.lgzClient.rpc.GlobalTransactRpc;
 import com.lgzClient.types.TransactContainer;
 import com.lgzClient.types.sql.service.GlobalTransaction;

@@ -1,5 +1,6 @@
 package com.lgzClient.service;
 
+import com.lgzClient.configure.ClientConfig;
 import com.lgzClient.annotations.DCSTransaction;
 import com.lgzClient.exceptions.DcsTransactionError;
 import com.lgzClient.rpc.BranchTransactRpc;
@@ -31,15 +32,16 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 @Slf4j
 @Component
 public class LocalTransactionManager {
-    public static void setDbExecutor(ExecutorService executor) {
-        dbExecutor = executor;
-    }
 
+    private Semaphore connectionSemaphore;
     private static ExecutorService dbExecutor = Executors.newFixedThreadPool(10);
+    @Autowired
+    ClientConfig clientConfig;
     @Autowired
     private NotDoneSqlLogUtil notDoneSqlLogUtil;
     @Autowired
@@ -62,10 +64,11 @@ public class LocalTransactionManager {
     @PostConstruct
     public void init() {
         instance = this;
+        this.connectionSemaphore = new Semaphore(clientConfig.getMaxHandlerConnection());
     }
 
     private static final ConcurrentHashMap<String, TransactContainer> localTransactionMaps = new ConcurrentHashMap<>();
-    
+
     //获得个人执行了n毫秒后还没有执行完的事务
 
     public ArrayList<TransactContainer> getUnDoTransactionsPersonal(long millisecond) {
@@ -110,7 +113,9 @@ public class LocalTransactionManager {
         return returnList;
     }
 
-    public void begin(String globalId, DCSTransaction dcsTransaction) throws SQLException, UnknownHostException {
+    //分布式连接开启
+    public void begin(String globalId, DCSTransaction dcsTransaction) throws SQLException, UnknownHostException, InterruptedException {
+
         BranchTransaction branchTransaction = branchTransactionUtil.buildDefaultTransaction();
         if (StringUtils.hasLength(globalId)) {//如果存在globalId那么就加入到当前的事务中
             branchTransaction.setGlobalId(globalId);//设置所属的globalId
@@ -138,14 +143,15 @@ public class LocalTransactionManager {
         branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);
     }
 
-    private Connection buildLocalTransaction(BranchTransaction branchTransaction) throws SQLException//新建一个本地事务,并将其绑定到当前的线程中
+    private Connection buildLocalTransaction(BranchTransaction branchTransaction) throws SQLException, InterruptedException//新建一个本地事务,并将其绑定到当前的线程中
     {
+        connectionSemaphore.acquire();//申请一个连接资源·········
         ConnectionWrapper connection = new ConnectionWrapper(transactionManager.getDataSource().getConnection());
         DCSThreadContext.connection.set(connection);
         connection.setAutoCommit(false);
         ConnectionHolder connectionHolder = new ConnectionHolder(connection);
         TransactionSynchronizationManager.bindResource(transactionManager.getDataSource(), connectionHolder);
-        localTransactionMaps.put(branchTransaction.getBranchId(), new TransactContainer(connection, branchTransaction,System.currentTimeMillis()));
+        localTransactionMaps.put(branchTransaction.getBranchId(), new TransactContainer(connection, branchTransaction, System.currentTimeMillis()));
         return connection;
     }
 
@@ -165,10 +171,7 @@ public class LocalTransactionManager {
         if (connection == null) return;
         synchronized (connection) {
             try {
-                if (connection.isClosed()) {
-                    removeLocalTransaction(branchId);
-                    return;
-                };
+                if(connection.isClosed()) return;
                 connection.rollback();
                 connection.setAutoCommit(true);
                 notDoneSqlLogUtil.deleteUnDoLogFromDatabase(connection, branchId);//从数据库中删除该未完成的事务
@@ -186,9 +189,14 @@ public class LocalTransactionManager {
                 throw new DcsTransactionError(sqlException.getMessage());
             } finally {
                 try {
-                    if (!connection.isClosed()) connection.close();
+                    if (!connection.isClosed()){//如果没有关闭
+                        connection.close();//关闭数据库连接
+                    }
                 } catch (SQLException sqlException) {
                     throw new DcsTransactionError(sqlException.getMessage());
+                }finally {
+                    removeLocalTransaction(branchId);//移除
+                    connectionSemaphore.release();//释放资源
                 }
             }
         }
@@ -228,7 +236,8 @@ public class LocalTransactionManager {
                     if (!connection.isClosed()) connection.close();
                 } catch (SQLException e) {
                     throw new DcsTransactionError(e.getMessage());
-                }finally {
+                } finally {
+                    connectionSemaphore.release();
                     removeLocalTransaction(branchId);
                 }
             }

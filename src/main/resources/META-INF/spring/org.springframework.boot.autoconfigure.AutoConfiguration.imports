@@ -5,6 +5,7 @@ com.lgzClient.service.LocalTransactionManager
 com.lgzClient.configure.WebClientConfig
 com.lgzClient.configure.TransactFeignHeaderConfigure
 com.lgzClient.configure.TractRestTemplateConfig
+com.lgzClient.configure.ClientConfig
 
 com.lgzClient.interceptors.DcsTransactionWebConfigure
 

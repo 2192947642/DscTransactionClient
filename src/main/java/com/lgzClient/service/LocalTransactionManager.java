@@ -169,8 +169,10 @@ public class LocalTransactionManager {
     public void rollBack(String branchId, Boolean useFlux, Boolean notice) {
         ConnectionWrapper connection = getConnection(branchId); //检测是否 设置了连接
         if (connection == null){//如果没有连接那么说明 是超时了,此时只需要对服务器进行通知就行了
-            BranchTransaction branchTransaction = BranchTransaction.builder().globalId(DCSThreadContext.globalId.get()).branchId(branchId).status(BranchStatus.rollback).build();
-            branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();
+            if(notice){
+                BranchTransaction branchTransaction = BranchTransaction.builder().globalId(DCSThreadContext.globalId.get()).branchId(branchId).status(BranchStatus.rollback).build();
+                branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();
+            }
             return;
         }
         synchronized (connection) {

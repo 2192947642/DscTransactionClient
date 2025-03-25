@@ -29,10 +29,7 @@ import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.*;
 
 @Slf4j
 @Component
@@ -142,7 +139,10 @@ public class LocalTransactionManager {
 
     private Connection buildLocalTransaction(BranchTransaction branchTransaction) throws SQLException, InterruptedException//新建一个本地事务,并将其绑定到当前的线程中
     {
-        connectionSemaphore.acquire(clientConfig.getCheckTimeOutIntervalPersonal());//申请一个连接资源·········
+        boolean acruired=connectionSemaphore.tryAcquire(clientConfig.getCheckTimeOutIntervalPersonal(), TimeUnit.MILLISECONDS);//申请一个连接资源·········
+        if(!acruired){
+            throw new DcsTransactionError("在指定时间内,并未获得到设置的Semphone");
+        }
         //如果有多余的连接资源 那么就添加notDoneSqlLog
         NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
         notDoneSqlLogUtil.addLogToDatabase(notDoneSqlLog);

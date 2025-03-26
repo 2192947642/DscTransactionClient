@@ -7,6 +7,7 @@ import com.lgzClient.types.sql.service.BranchTransaction;
 import com.lgzClient.types.sql.service.GlobalTransaction;
 import com.lgzClient.types.status.GlobalStatus;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,23 +17,24 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@Slf4j
 public class TimeOutConnectionHandler {
     @Autowired
     ClientConfig clientConfig;
-   // @PostConstruct
+    @PostConstruct
     public void init(){
         Executors.newScheduledThreadPool(1).scheduleWithFixedDelay(()->{
             try {
-                checkTimeOut();
+                checkTimeOutWaitOthers();
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                log.error(e.getMessage());
             }
         },0,clientConfig.getCheckTimeOutIntervalWaitOthers(), TimeUnit.MILLISECONDS);
         Executors.newScheduledThreadPool(1).scheduleWithFixedDelay(()->{
             try {
                 checkTimeOutPersonal();
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                log.error(e.getMessage());
             }
         },0,clientConfig.getCheckTimeOutIntervalPersonal(), TimeUnit.MILLISECONDS);
 
@@ -45,14 +47,9 @@ public class TimeOutConnectionHandler {
     //本地超时检查，避免数据库连接被长时间占用
     public void checkTimeOutPersonal(){
         ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactionsPersonal(clientConfig.getCheckTimeOutIntervalPersonal());
-        if(transactContainers.size()==0) return;
-        for(TransactContainer transactContainer : transactContainers){
-           localTransactionManager.rollBackByThreadPoolAndWebFlux(transactContainer.getBranchTransaction());
-        }
+        checkTimeOut(transactContainers);
     }
-    //远程超时检查
-    public void checkTimeOut() {
-        ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactionsWaitOther(clientConfig.getCheckTimeOutIntervalWaitOthers());
+    public void checkTimeOut(ArrayList<TransactContainer> transactContainers){
         if(transactContainers.size()==0) return;
         ArrayList<String> globalIds=new ArrayList<>();
         for (TransactContainer transactContainer : transactContainers) {
@@ -73,6 +70,11 @@ public class TimeOutConnectionHandler {
                 localTransactionManager.commitByThreadPoolAndWebFlux(branchTransaction);
             }
         }
+    }
+    //远程超时检查
+    public void checkTimeOutWaitOthers() {
+        ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactionsWaitOther(clientConfig.getCheckTimeOutIntervalWaitOthers());
+        checkTimeOut(transactContainers);
     }
 
 }

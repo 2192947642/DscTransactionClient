@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 public class TimeOutConnectionHandler {
     @Autowired
     ClientConfig clientConfig;
-    @PostConstruct
+   // @PostConstruct
     public void init(){
         Executors.newScheduledThreadPool(1).scheduleWithFixedDelay(()->{
             try {

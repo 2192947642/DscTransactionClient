@@ -30,6 +30,10 @@ public class DCSResponseAdvice implements  ResponseBodyAdvice<Object> {
     }
     @Override
     public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType, Class<? extends HttpMessageConverter<?>> selectedConverterType, ServerHttpRequest request, ServerHttpResponse response) {
+         //仅允许发送一次通知 来表示当前线程执行结果
+       if(DCSThreadContext.sended.get()!=null&&DCSThreadContext.sended.get()){
+           return body;
+       }
         BranchTransaction branchTransaction= DCSThreadContext.branchTransaction.get();
         if(DCSThreadContext.error.get()!=null){//如果抛出了异常 那么就直接进行回滚
             //1.本身服务出现了异常 2.获取connection资源时出现了超时异常,此时connection并未获得
@@ -38,6 +42,7 @@ public class DCSResponseAdvice implements  ResponseBodyAdvice<Object> {
         else {//如果没有抛出异常,那么就向远程提交本地事务执行成功
             localTransactionManager.success(branchTransaction,StatusUtil.instance.isBegin());
         }
+        DCSThreadContext.sended.set(true);
         return body;
     }
 }

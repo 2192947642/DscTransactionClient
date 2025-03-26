@@ -6,7 +6,8 @@ import java.sql.Connection;
 import java.util.ArrayList;
 
 public class DCSThreadContext {
-
+    //当前线程是否已经发送过
+    public static final ThreadLocal<Boolean> sended=new ThreadLocal<Boolean>();
     public static final ThreadLocal<String> globalId=new ThreadLocal<String>();
     public static final ThreadLocal<Throwable> error=new ThreadLocal<Throwable>();
     public static final ThreadLocal<Connection> connection =new ThreadLocal<Connection>();
@@ -25,6 +26,7 @@ public class DCSThreadContext {
         DCSThreadContext.branchTransaction.set(branchTransaction);
     }
     public static void removeAll(){
+        sended.remove();
         branchTransaction.remove();
         isDscTransaction.remove();
         globalId.remove();

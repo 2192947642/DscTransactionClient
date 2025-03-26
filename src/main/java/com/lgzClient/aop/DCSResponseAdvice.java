@@ -34,17 +34,10 @@ public class DCSResponseAdvice implements  ResponseBodyAdvice<Object> {
         BranchTransaction branchTransaction= DCSThreadContext.branchTransaction.get();
         if(DCSThreadContext.error.get()!=null){//如果抛出了异常 那么就直接进行回滚
             //1.本身服务出现了异常 2.获取connection资源时出现了超时异常,此时connection并未获得
-            localTransactionManager.rollBack(branchTransaction.getBranchId(),false,true);//回滚本地事务
+            localTransactionManager.rollBack(branchTransaction,false,true);//回滚本地事务
         }
-        else {//如果没有抛出异常
-            NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
-            notDoneSqlLogUtil.updateLogOfDBS(notDoneSqlLog);//将localLog更新到数据库中
-            localTransactionManager.updateLocalSuccessTime(branchTransaction.getBranchId());
-            if(StatusUtil.instance.isBegin()){//如果是分布式事务的发起者 那么通知全局事务成功
-                localTransactionManager.updateStatusWithNotice(branchTransaction, BranchStatus.success);
-            }else{
-                localTransactionManager.updateStatus(branchTransaction, BranchStatus.success);//修改redis状态为成功
-            }
+        else {//如果没有抛出异常,那么就向远程提交本地事务执行成功
+            localTransactionManager.success(branchTransaction,StatusUtil.instance.isBegin());
         }
         return body;
     }

@@ -14,6 +14,7 @@ import com.lgzClient.types.sql.service.BranchTransaction;
 import com.lgzClient.types.status.BranchStatus;
 import com.lgzClient.utils.BranchTransactionUtil;
 import com.lgzClient.utils.NotDoneSqlLogUtil;
+import com.lgzClient.utils.StatusUtil;
 import com.lgzClient.utils.TimeUtil;
 import com.lgzClient.wrapper.ConnectionWrapper;
 import jakarta.annotation.PostConstruct;
@@ -126,13 +127,21 @@ public class LocalTransactionManager {
     }
 
     //修改存储在服务端中的本地事务状态
-    public void updateStatus(BranchTransaction branchTransaction, BranchStatus branchStatus) {
-        branchTransaction.setStatus(branchStatus);
+    private void updateStatus(BranchTransaction branchTransaction, BranchStatus branchStatus) {
         branchTransaction.setStatus(branchStatus);
         branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//修改存储在远程的分支事务状态
     }
 
-    public void updateStatusWithNotice(BranchTransaction branchTransaction, BranchStatus branchStatus) {
+    private void updateStatusWithNoticeFlux(BranchTransaction branchTransaction, BranchStatus branchStatus) {
+        branchTransaction.setStatus(branchStatus);
+        branchTransactRpcWebFlux.updateBranchTransactionStatusWithNotice(branchTransaction).subscribe();
+    }
+    private void updateStatusFlux(BranchTransaction branchTransaction, BranchStatus branchStatus) {
+        branchTransaction.setStatus(branchStatus);
+        branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();//修改存储在远程的分支事务状态
+    }
+
+    private void updateStatusWithNotice(BranchTransaction branchTransaction, BranchStatus branchStatus) {
         branchTransaction.setStatus(branchStatus);
         branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);
     }
@@ -165,13 +174,22 @@ public class LocalTransactionManager {
         localTransactionMaps.remove(branchId);
     }
 
+    public void success(BranchTransaction branchTransaction,boolean notice){
+        NotDoneSqlLog notDoneSqlLog = notDoneSqlLogUtil.buildNotDoneLogByThread();//建立localLog
+        notDoneSqlLogUtil.updateLogOfDBS(notDoneSqlLog);//将localLog更新到数据库中
+        this.updateLocalSuccessTime(branchTransaction.getBranchId());
+        if(notice){//如果是分布式事务的发起者 那么通知全局事务成功
+            this.updateStatusWithNotice(branchTransaction, BranchStatus.success);
+        }else{
+            this.updateStatus(branchTransaction, BranchStatus.success);//修改redis状态为成功
+        }
+    }
     //回滚事务
-    public void rollBack(String branchId, Boolean useFlux, Boolean notice) {
-        ConnectionWrapper connection = getConnection(branchId); //检测是否 设置了连接
+    public void rollBack(BranchTransaction branchTransaction, Boolean useFlux, Boolean notice) {
+        ConnectionWrapper connection = getConnection(branchTransaction.getBranchId()); //检测是否 设置了连接
         if (connection == null){//如果没有连接那么说明 是超时了,此时只需要对服务器进行通知就行了
             if(notice){
-                BranchTransaction branchTransaction = BranchTransaction.builder().globalId(DCSThreadContext.globalId.get()).branchId(branchId).status(BranchStatus.rollback).build();
-                branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();
+                this.updateStatusWithNoticeFlux(branchTransaction, BranchStatus.rollback);;
             }
             return;
         }
@@ -180,16 +198,15 @@ public class LocalTransactionManager {
                 if(connection.isClosed()) return;
                 connection.rollback();
                 connection.setAutoCommit(true);
-                notDoneSqlLogUtil.deleteUnDoLogFromDatabase(connection, branchId);//从数据库中删除该未完成的事务
-                BranchTransaction branchTransaction = BranchTransaction.builder().globalId(DCSThreadContext.globalId.get()).branchId(branchId).status(BranchStatus.rollback).build();
+                notDoneSqlLogUtil.deleteUnDoLogFromDatabase(connection, branchTransaction.getBranchId());//从数据库中删除该未完成的事务
                 if (!notice) {
-                    if (!useFlux) branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态 为回滚
-                    else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();
+                    if (!useFlux) this.updateStatus(branchTransaction,BranchStatus.rollback);//更新服务端的分支事务状态 为回滚
+                    else this.updateStatusFlux(branchTransaction, BranchStatus.rollback);
                 } else if (notice) {
                     if (!useFlux)
-                        branchTransactRpc.updateBranchTransactionStatusWithNotice(branchTransaction);//更新服务端的分支事务状态 为回滚
+                        this.updateStatusWithNotice(branchTransaction,BranchStatus.rollback);//更新服务端的分支事务状态 为回滚
                     else
-                        branchTransactRpcWebFlux.updateBranchTransactionStatusWithNotice(branchTransaction).subscribe();
+                        this.updateStatusWithNoticeFlux(branchTransaction, BranchStatus.rollback);
                 }
             } catch (SQLException sqlException) {
                 throw new DcsTransactionError(sqlException.getMessage());
@@ -201,7 +218,7 @@ public class LocalTransactionManager {
                 } catch (SQLException sqlException) {
                     throw new DcsTransactionError(sqlException.getMessage());
                 }finally {
-                    removeLocalTransaction(branchId);//移除
+                    removeLocalTransaction(branchTransaction.getBranchId());//移除
                     connectionSemaphore.release();//释放资源
                 }
             }
@@ -209,32 +226,32 @@ public class LocalTransactionManager {
     }
 
     //回滚事务 通过线程池和flux 不会通知服务器
-    public void rollBackByThreadPoolAndWebFlux(String branchId) {
+    public void rollBackByThreadPoolAndWebFlux(BranchTransaction branchTransaction) {
         dbExecutor.submit(() -> {
-            rollBack(branchId, true, false);
+            rollBack(branchTransaction, true, false);
         });
     }
 
-    public void commitByThreadPoolAndWebFlux(String branchId) {
+    public void commitByThreadPoolAndWebFlux(BranchTransaction branchTransaction) {
         dbExecutor.submit(() -> {
-            commit(branchId, true);
+            commit(branchTransaction, true);
         });
     }
 
     //提交事务
-    public void commit(String branchId, Boolean useFlux) {
-        ConnectionWrapper connection = getConnection(branchId);
+    public void commit(BranchTransaction branchTransaction, Boolean useFlux) {
+        ConnectionWrapper connection = getConnection(branchTransaction.getBranchId());
         if (connection == null) return;
         synchronized (connection) {
             try {
                 if (connection.isClosed()) {
                     return;
                 };
-                notDoneSqlLogUtil.deleteUnDoLogFromDatabase(connection, branchId);//从数据库中删除该未完成的事务
+                notDoneSqlLogUtil.deleteUnDoLogFromDatabase(connection, branchTransaction.getBranchId());//从数据库中删除该未完成的事务
                 connection.commit();//提交事务 提交后同时也删除了本地事务的记录 防止了事务多次提交
-                BranchTransaction branchTransaction = BranchTransaction.builder().branchId(branchId).status(BranchStatus.commit).build();
-                if (!useFlux) branchTransactRpc.updateBranchTransactionStatus(branchTransaction);//更新服务端的分支事务状态
-                else branchTransactRpcWebFlux.updateBranchTransactionStatus(branchTransaction).subscribe();
+
+                if (!useFlux) this.updateStatus(branchTransaction, BranchStatus.commit);//更新服务端的分支事务状态
+                else this.updateStatusFlux(branchTransaction, BranchStatus.commit);
             } catch (SQLException e) {
                 throw new DcsTransactionError(e.getMessage());
             } finally {
@@ -244,7 +261,7 @@ public class LocalTransactionManager {
                     throw new DcsTransactionError(e.getMessage());
                 } finally {
                     connectionSemaphore.release();
-                    removeLocalTransaction(branchId);
+                    removeLocalTransaction(branchTransaction.getBranchId());
                 }
             }
         }

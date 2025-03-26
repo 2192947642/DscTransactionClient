@@ -3,6 +3,7 @@ package com.lgzClient.service;
 import com.lgzClient.configure.ClientConfig;
 import com.lgzClient.rpc.GlobalTransactRpc;
 import com.lgzClient.types.TransactContainer;
+import com.lgzClient.types.sql.service.BranchTransaction;
 import com.lgzClient.types.sql.service.GlobalTransaction;
 import com.lgzClient.types.status.GlobalStatus;
 import jakarta.annotation.PostConstruct;
@@ -46,7 +47,7 @@ public class TimeOutConnectionHandler {
         ArrayList<TransactContainer> transactContainers =localTransactionManager.getUnDoTransactionsPersonal(clientConfig.getCheckTimeOutIntervalPersonal());
         if(transactContainers.size()==0) return;
         for(TransactContainer transactContainer : transactContainers){
-           localTransactionManager.rollBackByThreadPoolAndWebFlux(transactContainer.getBranchTransaction().getBranchId());
+           localTransactionManager.rollBackByThreadPoolAndWebFlux(transactContainer.getBranchTransaction());
         }
     }
     //远程超时检查
@@ -64,13 +65,12 @@ public class TimeOutConnectionHandler {
             globalTransactionHashMap.put(globalTransaction.getGlobalId(),globalTransaction);
         }
         for (TransactContainer transactContainer : transactContainers){
-            String globalId=transactContainer.getBranchTransaction().getGlobalId();
-            String branchId=transactContainer.getBranchTransaction().getBranchId();
-            if(globalTransactionHashMap.get(globalId).getStatus() == GlobalStatus.fail){
-                localTransactionManager.rollBackByThreadPoolAndWebFlux(branchId);
+            BranchTransaction branchTransaction=transactContainer.getBranchTransaction();
+            if(globalTransactionHashMap.get(branchTransaction.getGlobalId()).getStatus() == GlobalStatus.fail){
+                localTransactionManager.rollBackByThreadPoolAndWebFlux(branchTransaction);
             }
-            else if(globalTransactionHashMap.get(globalId).getStatus()== GlobalStatus.success){
-                localTransactionManager.commitByThreadPoolAndWebFlux(branchId);
+            else if(globalTransactionHashMap.get(branchTransaction.getGlobalId()).getStatus()== GlobalStatus.success){
+                localTransactionManager.commitByThreadPoolAndWebFlux(branchTransaction);
             }
         }
     }

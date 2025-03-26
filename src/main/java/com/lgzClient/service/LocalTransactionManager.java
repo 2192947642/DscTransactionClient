@@ -66,7 +66,9 @@ public class LocalTransactionManager {
     }
 
     private static final ConcurrentHashMap<String, TransactContainer> localTransactionMaps = new ConcurrentHashMap<>();
-
+    public TransactContainer getTransactionContainerById(String branchId) {
+        return LocalTransactionManager.localTransactionMaps.get(branchId);
+    }
     //获得个人执行了n毫秒后还没有执行完的事务
 
     public ArrayList<TransactContainer> getUnDoTransactionsPersonal(long millisecond) {

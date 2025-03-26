@@ -18,8 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 @ControllerAdvice
 public class DCSResponseAdvice implements  ResponseBodyAdvice<Object> {
-    @Autowired
-    NotDoneSqlLogUtil notDoneSqlLogUtil;
+
     @Autowired
     LocalTransactionManager localTransactionManager;
     @Override
